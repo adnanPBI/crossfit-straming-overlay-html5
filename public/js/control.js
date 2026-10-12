@@ -50,18 +50,22 @@ function updateOutputs(){
 }
 function updateLogo(){
   const url=current?.settings?.left?.logoDataUrl;
+  const sponsor=current?.settings?.right?.sponsorDataUrl;
+  const s=$('#sponsorPreview');s.hidden=!sponsor;if(sponsor)s.src=sponsor;else s.removeAttribute('src');
   const box=$('#logoPreview');
   if(url){const img=document.createElement('img');img.src=url;img.alt='Selected logo';box.replaceChildren(img);}
   else {const span=document.createElement('span');span.textContent='+';box.replaceChildren(span);}
 }
 function updateMode(){
   const mode=current?.settings?.timerSettings?.mode||'intervals';
+  $$('#modeChips button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===mode)));
   $$('.mode-field').forEach(element=>element.classList.toggle('hidden',!element.dataset.modes.split(' ').includes(mode)));
 }
 function populate(){
   if(!current)return;
   lang=current.settings.language||'de';
   translateDocument(document,lang);
+  $$('#modeChips button').forEach(chip=>chip.textContent=t(lang,chip.dataset.mode));
   $('#languageSelect').value=lang;
   for(const element of $$('[data-path]')){
     const value=deepGet(current.settings,element.dataset.path);
@@ -177,7 +181,7 @@ function setupInputs(){
     if(!current)return;
     lang=e.target.value;
     current.settings.language=lang;
-    translateDocument(document,lang);updateTransport();renderScenes();
+    translateDocument(document,lang);$$('#modeChips button').forEach(chip=>chip.textContent=t(lang,chip.dataset.mode));updateTransport();renderScenes();
     schedulePatch('language',lang);
   });
 }
@@ -205,7 +209,13 @@ function setupButtons(){
   $('#startPauseBtn').addEventListener('click',()=>void run(async()=>{await flushPatch();await api.timer(current?.timer?.status==='running'?'pause':'start');}));
   $('#resetBtn').addEventListener('click',()=>void run(async()=>{await flushPatch();await api.timer('reset');}));
   $('#nextBtn').addEventListener('click',()=>void run(async()=>{await flushPatch();await api.timer('next');}));
-  $('#beepBtn').addEventListener('click',()=>beep());
+  $('#prevBtn').addEventListener('click',()=>void run(async()=>{await flushPatch();await api.timer('previous');}));
+  const chips=$('#modeChips');
+  for(const mode of ['intervals','tabata','emom','amrap','fortime','countdown','stopwatch','sequence']){
+    const chip=document.createElement('button');chip.type='button';chip.className='mode-chip';chip.dataset.mode=mode;chip.textContent=t(lang,mode);
+    chip.addEventListener('click',()=>{const input=$('#timerMode');input.value=mode;input.dispatchEvent(new Event('change',{bubbles:true}));});chips.append(chip);
+  }
+  $('#beepBtn').addEventListener('click',()=>beep(760,0.12,current?.settings?.timerSettings?.beepVolume/100 ?? 0.7));
   $('#saveSceneBtn').addEventListener('click',()=>void run(async()=>{
     await flushPatch();const input=$('#sceneName');const name=input.value.trim();if(!name)return input.focus();
     await api.scene(name);input.value='';await refreshScenes();notify(t(lang,'sceneSaved'));
@@ -226,6 +236,14 @@ function setupButtons(){
     const data=JSON.parse(await file.text());await api.import(data);await refreshScenes();notify(t(lang,'imported'));e.target.value='';
   }));
   $('#uploadLogoBtn').addEventListener('click',()=>$('#logoFile').click());
+  $('#uploadSponsorBtn').addEventListener('click',()=>$('#sponsorFile').click());
+  $('#sponsorFile').addEventListener('change',(e)=>void run(async()=>{
+    const file=e.target.files?.[0];if(!file)return;
+    if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2_000_000){notify(t(lang,'badImage'),true);return;}
+    const data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});
+    await flushPatch();await api.patch({right:{sponsorDataUrl:data,showSponsor:true}});e.target.value='';notify(t(lang,'savedMessage'));
+  }));
+  $('#removeSponsorBtn').addEventListener('click',()=>void run(async()=>{await flushPatch();await api.patch({right:{sponsorDataUrl:'',showSponsor:false}});notify(t(lang,'savedMessage'));}));
   $('#logoFile').addEventListener('change',(e)=>void run(async()=>{
     const file=e.target.files?.[0];if(!file)return;
     if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2_000_000){notify(t(lang,'badImage'),true);return;}
@@ -233,6 +251,10 @@ function setupButtons(){
     await flushPatch();await api.patch({left:{logoDataUrl:base64,showLogo:true}});e.target.value='';notify(t(lang,'savedMessage'));
   }));
   $('#removeLogoBtn').addEventListener('click',()=>void run(async()=>{await flushPatch();await api.patch({left:{logoDataUrl:''}});notify(t(lang,'savedMessage'));}));
+  const copyUrl=async(url)=>{try{await navigator.clipboard.writeText(url);notify(t(lang,'copied'));}catch{notify(url);}};
+  $('#copyRemoteBtn').addEventListener('click',()=>void copyUrl(`${location.origin}/remote`));
+  $('#copyBlackBtn').addEventListener('click',()=>void copyUrl(`${location.origin}/overlay?bg=black`));
+  $('#copyGreenBtn').addEventListener('click',()=>void copyUrl(`${location.origin}/overlay?bg=green`));
   $('#copyOverlayBtn').addEventListener('click',async()=>{
     try{await navigator.clipboard.writeText(`${location.origin}/overlay`);notify(t(lang,'copied'));}
     catch{notify(`${location.origin}/overlay`);}
@@ -245,6 +267,7 @@ function setupButtons(){
     if(key===' '){e.preventDefault();$('#startPauseBtn').click();}
     else if(key==='r'){$('#resetBtn').click();}
     else if(key==='n'){$('#nextBtn').click();}
+    else if(key==='b'){$('#prevBtn').click();}
   });
 }
 function connectStream(){

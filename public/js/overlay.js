@@ -4,7 +4,10 @@ import {beep} from './api.js';
 
 const $=(id)=>document.getElementById(id);
 const stage=$('stage');
-const isPreview=new URLSearchParams(location.search).has('preview');
+const params=new URLSearchParams(location.search);
+const isPreview=params.has('preview');
+const outputBg=['black','green'].includes(params.get('bg'))?params.get('bg'):'transparent';
+stage.style.backgroundColor=outputBg==='green'?'#00ff00':outputBg==='black'?'#000':'transparent';
 let latest=null,offset=0,lastPhase=null,lastStatus='idle',initialized=false;
 let lang='de';
 let previousClockText='',lastClockSecond=-1;
@@ -27,10 +30,14 @@ function settingsChanged(settings){
     '--left-font':`${l.fontSize}px`,
     '--right-font':`${r.fontSize}px`,
     '--left-color':l.color,
-    '--right-color':r.color
+    '--right-color':r.color,
+    '--scrim-left':a.leftScrim/100,
+    '--scrim-center':a.centerScrim/100,
+    '--scrim-right':a.rightScrim/100
   });
   stage.classList.toggle('no-panel-bg',a.hidePanelBackground);
   stage.classList.toggle('no-animation',!a.animations);
+  stage.classList.toggle('no-text-shadow',!a.textShadow);
   style($('leftZone'),{textAlign:l.align});
   style($('rightZone'),{textAlign:r.align});
   assignFont($('brandTitle'),l.font);
@@ -44,6 +51,7 @@ function settingsChanged(settings){
   show($('brandTitle'),l.showTitle);setText('brandTitle',l.title);
   show($('brandSubtitle'),l.showSubtitle);setText('brandSubtitle',l.subtitle);
   show($('brandCustom'),l.showCustom);setText('brandCustom',l.customText);
+  show($('athleteBadge'),l.showAthlete && !!l.athlete);setText('athleteBadge',l.athlete);
   show($('timerBig'),m.showTimer);
   show($('phasePill'),m.showPhase);
   show($('roundLabel'),m.showRound);
@@ -55,6 +63,10 @@ function settingsChanged(settings){
   show($('coachSection'),r.showCoach);setText('coachLabel',t(lang,'coachLabel'));setText('coachName',r.coach);
   show($('notesSection'),r.showNotes);setText('notesText',r.notes);
   show($('clockSection'),r.showClock);setText('localClockLabel',t(lang,'clockLabel'));
+  show($('sponsorWrap'),r.showSponsor && !!r.sponsorDataUrl);
+  if(r.sponsorDataUrl && $('sponsorLogo').getAttribute('src')!==r.sponsorDataUrl)$('sponsorLogo').src=r.sponsorDataUrl;
+  $('sponsorLogo').style.maxHeight=`${r.sponsorHeight}px`;
+  show($('tickerBar'),r.showTicker && !!r.tickerText.trim());setText('tickerText',r.tickerText);
   setText('progressLead',t(lang,'current'));
   setText('phaseKicker',`WOD / ${t(lang,'status').toUpperCase()}`);
   $('brandLogo').style.objectPosition=l.align==='right'?'right center':l.align==='center'?'center center':'left center';
@@ -91,23 +103,22 @@ function tick(){
   if(phase?.type==='rest')color=settings.timerSettings.restColor;
   else if(phase?.type==='prepare')color=settings.timerSettings.warningColor;
   else if(settings.timerSettings.trafficLights && phase && Number.isFinite(phase.durationMs) && !isFinished){
-    const pct=d.remainingMs/phase.durationMs;
-    if(pct<=.15)color=settings.timerSettings.dangerColor;
-    else if(pct<=.4)color=settings.timerSettings.warningColor;
+    if(d.remainingMs<=settings.timerSettings.redSec*1000)color=settings.timerSettings.dangerColor;
+    else if(d.remainingMs<=settings.timerSettings.yellowSec*1000)color=settings.timerSettings.warningColor;
   }
   if(isFinished)color=settings.timerSettings.primaryColor;
   stage.style.setProperty('--current-color',color);
   typeColors.current=color;
   const activeId=phase?.id||'none';
   if(initialized && timer.status==='running' && settings.timerSettings.sound && !isPreview && lastPhase!==null && activeId!==lastPhase) {
-    beep(phase?.type==='rest'?520:phase?.type==='prepare'?650:830,.17);
+    beep(phase?.type==='rest'?520:phase?.type==='prepare'?650:830,.17,settings.timerSettings.beepVolume/100);
   }
-  if(initialized && settings.timerSettings.sound && !isPreview && isFinished && lastStatus==='running')beep(1100,.3);
+  if(initialized && settings.timerSettings.sound && !isPreview && isFinished && lastStatus==='running')beep(1100,.3,settings.timerSettings.beepVolume/100);
   initialized=true;lastPhase=activeId;lastStatus=state;
   const date=new Date(now);
   if(lastClockSecond!==Math.floor(now/1000)){
     lastClockSecond=Math.floor(now/1000);
-    try{setText('localClock',new Intl.DateTimeFormat(localeTag[lang]||'en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(date));}
+    try{setText('localClock',new Intl.DateTimeFormat(localeTag[lang]||'en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:!settings.appearance.clock24}).format(date));}
     catch{setText('localClock',date.toLocaleTimeString());}
   }
 }

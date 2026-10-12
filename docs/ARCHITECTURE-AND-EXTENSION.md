@@ -109,3 +109,10 @@ npm test
 ```
 
 `tests/ui-offline.py` tests actual control JS with a simulated API in a Chromium environment where URL navigation is blocked. `tests/visual-qa.py` checks the HTML/CSS/overlay JS against real viewport sizes. To run end-to-end on a normal computer, use `tests/browser-smoke.py` against a **disposable** running instance and the optional Playwright dependencies; then complete actual OBS/Zoom steps in `docs/ACCEPTANCE.md`. Tests are not an executed client hardware certification.
+
+
+## Release 1.1.0 selective cherry-pick architecture
+
+The CHALKLINE/Grok workspace was assessed as a feature reference, not copied as a React application. Its concepts were re-implemented as dependency-free ES modules preserving the original Node server, key-gated control APIs and read-only OBS browser source. New files: `public/js/formula-v2.js`, `public/js/remote.js`, `public/css/remote.css`, `public/remote.html`, `tests/enhancements.test.mjs`, `tests/remote-ui.py`, and `docs/CHERRY-PICK-AUDIT.md`. The `timer-engine.js` remains shared between browser, remote and server so the timer cannot drift between screens. Backups continue to use `crossfit-overlay-v1`; the read path fills new schema defaults automatically and existing saved scenes remain valid.
+
+The public overlay page can also use `?bg=black` or `?bg=green` for Zoom/chroma-key use; this parameter never grants remote-control access. The phone deck uses the existing random control key and SSE subscriber connection; no anonymous room-code mutation is introduced.

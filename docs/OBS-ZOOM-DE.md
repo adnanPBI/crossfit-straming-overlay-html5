@@ -59,3 +59,13 @@ Browser-Quelle mit derselben URL, 1920×1080 und transparentem Seitenhintergrund
 - Änderungen am Timerprofil setzen den Timer zurück; das ist bewusst so implementiert. Texte/Logo/Layouts ändern den laufenden Timer nicht.
 
 **Physischer Abnahmetest erforderlich:** OBS-Aufnahme sowie Zoom-Testcall auf Kundengerät, einschließlich beobachteter Smartphone-Änderung. Automated Code/API tests ersetzen diesen Test nicht. Prüfliste in `ACCEPTANCE.md`.
+
+
+### Zusätzliche Streaming-Wege (v1.1)
+
+- Transparente OBS-Browserquelle: `http://localhost:4173/overlay`.
+- Schwarzer Zoom-Hintergrund: `http://localhost:4173/overlay?bg=black`.
+- Greenscreen-Variante: `http://localhost:4173/overlay?bg=green` (Chroma-Key nur nach Bedarf konfigurieren).
+- Kompakte Handy-Steuerung: `http://DEINE-LAN-IP:4173/remote` – mit vorhandenem Steuerschlüssel.
+- Zeitformeln: `20/10*8` und `(arbeit 40 + pause 20)*8`. Trainingsarten: AMRAP, EMOM, Tabata und For Time.
+- Signallautstärke und Schwellenwerte sind einstellbar. Die virtuelle OBS-Kamera überträgt **nur Video**; Audio-Routing in einem echten Zoom-Test prüfen.

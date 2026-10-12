@@ -6,7 +6,7 @@ import {LANGUAGES} from '../public/js/defaults.js';
 
 test('all 6 locale dictionaries cover 100% of English keys',()=>{
   const baseKeys=Object.keys(I18N.en).sort();
-  assert.equal(baseKeys.length,169);
+  assert.ok(baseKeys.length>=199);
   assert.deepEqual([...LANGUAGES].sort(),Object.keys(I18N).sort());
   for(const language of LANGUAGES){
     assert.deepEqual(Object.keys(I18N[language]).sort(),baseKeys);

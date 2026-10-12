@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0c141b"><title>WOD Stream Studio · Remote Deck</title><link rel="stylesheet" href="/css/remote.css"><script type="module" src="/js/remote.js"></script></head>
+<body>
+<main class="remote-shell" aria-label="Mobile workout controller">
+  <header class="remote-header"><div class="lockup"><span class="logo-mark">W<span>●</span></span><div><h1>WOD <b>STREAM</b></h1><small data-t="remoteDeck">MOBILE REMOTE DECK</small></div></div><a href="/control" data-t="fullStudio">Open studio</a></header>
+  <div class="online-status" role="status"><span id="syncDot" class="dot"></span><span id="syncText" data-t="offline">Reconnecting</span><label class="lang-control"><span data-t="language">Language</span><select id="remoteLanguage" aria-label="Interface language"><option value="de">DE</option><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option><option value="it">IT</option><option value="pt">PT</option></select></label></div>
+  <section class="readout"><div class="eyebrow" data-t="current">CURRENT PHASE</div><p id="phaseName" class="phase">READY</p><output id="timerReadout" class="digits">00:00</output><p id="roundReadout" class="round">–</p><div class="bar"><span id="progressMeter"></span></div></section>
+  <section class="actions" aria-label="Timer controls"><button id="toggleBtn" class="primary" type="button" data-t="start">Start</button><button id="resetBtn" type="button" data-t="reset">Reset</button><button id="previousBtn" type="button" data-t="previous">Previous</button><button id="nextBtn" type="button" data-t="next">Next</button></section>
+  <section class="scenes" aria-label="Scene quick switch"><div class="eyebrow" data-t="scenesTitle">SCENES</div><div id="scenesList" class="scene-chips"></div></section>
+  <section class="hints"><p data-t="remoteHint">Use this controller on trusted Wi-Fi. Space = Start/Pause, R = Reset, B = Previous, N = Next.</p><p><span data-t="remoteView">OBS output:</span> <a href="/overlay" target="_blank" rel="noopener">/overlay ↗</a></p></section>
+  <output id="toast" class="toast" role="status" aria-live="polite"></output>
+</main>
+<div id="loginOverlay" class="login-backdrop" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><form id="loginForm" class="login-card"><div class="login-glyph">◈</div><h2 id="loginTitle" data-t="keyTitle">Connect controller</h2><p data-t="keyInfo">Enter the control key shown in the local server terminal.</p><label><span data-t="controlKey">Control key</span><input required type="password" id="keyInput" autocomplete="off" minlength="12"></label><p id="loginError" class="error" role="alert"></p><button type="submit" data-t="connect">Connect</button></form></div>
+</body></html>

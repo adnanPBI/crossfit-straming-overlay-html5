@@ -20,13 +20,13 @@ export class Api {
   export(){return this.request('/api/export');}
   import(body){return this.request('/api/import',{method:'POST',body:JSON.stringify(body)});}
 }
-export function beep(frequency=760,duration=0.12){
+export function beep(frequency=760,duration=0.12,volume=0.7){
   const Context=window.AudioContext||window.webkitAudioContext;
   if(!Context)return;
   try{
     const ctx=new Context(),osc=ctx.createOscillator(),gain=ctx.createGain();
     osc.type='sine';osc.frequency.value=frequency;gain.gain.setValueAtTime(0.0001,ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.12,ctx.currentTime+0.015);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001,Math.min(0.16,0.16*volume)),ctx.currentTime+0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+duration);
     osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+duration+0.01);
     osc.onended=()=>void ctx.close();

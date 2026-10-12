@@ -78,3 +78,13 @@ Use the URL `http://localhost:4173/overlay`, viewport 1920×1080, and put it abo
 ## Actual acceptance evidence to capture
 
 Attach screenshots or a short recording from the client's PC showing: camera under transparent overlay; 1920×1080 source properties; multiple phase changes; phone controls; Zoom settings showing OBS Virtual Camera; second Zoom participant receiving updated video; audio route if audio-in-Zoom is in the agreed scope. This is a **manual real-machine test**, not something proven by the bundled Node tests.
+
+
+### Additional v1.1 streaming paths
+
+- Transparent OBS source: `http://localhost:4173/overlay`.
+- Black Zoom-friendly background: `http://localhost:4173/overlay?bg=black`.
+- Chroma green background: `http://localhost:4173/overlay?bg=green` (configure chroma key only if your workflow needs it).
+- Separate compact phone control: `http://YOUR-LAN-IP:4173/remote` — use the existing control key.
+- Time formulas accept `20/10*8` and `(work 40 + rest 20)*8`. Workout protocols include AMRAP, EMOM, Tabata and For Time.
+- Beep volume/threshold settings affect overlay audio/visual timing but OBS Virtual Camera **still transports video only**. Test audio routing in a real Zoom meeting.

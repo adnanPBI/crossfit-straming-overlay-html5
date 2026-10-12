@@ -1,14 +1,14 @@
 {
   "name": "crossfit-stream-overlay",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Self-hosted multilingual, three-zone live workout overlay and remote controller for OBS / Zoom",
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check server.mjs && node --check public/js/control.js && node --check public/js/overlay.js"
+    "check": "node --check server.mjs && node --check public/js/control.js && node --check public/js/overlay.js && node --check public/js/remote.js && node --check public/js/formula-v2.js"
   },
   "license": "SEE LICENSE-AND-RIGHTS.md",
   "dependencies": {}

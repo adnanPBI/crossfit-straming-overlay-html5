@@ -96,3 +96,10 @@
 5. **Rechteübergabe?** Lesbarer Code und Handover-Vorlage enthalten, vertragliche Rechteübertragung nach Zahlung schriftlich festzuhalten.
 6. **Hostingkosten?** Lokal keine wiederkehrenden Gebühren für die Kernsoftware; Server-/Domainkosten nur optional.
 7. **Zeitplan?** Fünf Arbeitstage als angebotener Meilensteinplan ab Startfreigabe, mit Prüfung/Freigabe nach jedem Teil.
+
+
+## Erweiterte UI-Funktionen aus dem Vergleichsprojekt (Release 1.1.0)
+
+Diese im Code bereits implementierten Zusatzfunktionen werden ohne neue Drittanbieter-Lizenzen bereitgestellt: AMRAP, EMOM, Tabata, For Time, Zeitformeln mit Work/Rest-Paaren und Wiederholungen, Intervall-zurück, Heat-/Teilnehmerlabel, ein Sponsorenlogo, Lauftext, Hintergrund-Verläufe und Textschatten, 12-/24-Stunden-Uhr, Schwarz-/Greenscreen-Overlay, Warnschwellen und Tonlautstärke, Quick-Mode-Schaltflächen, Timer-only-Szene sowie separate Smartphone-Fernbedienung. In der ursprünglichen Kalkulation gelten sie als **kostenneutral zusätzlich im Quellcode enthalten**. Der vereinbarte Festpreis von 200 € erhöht sich nicht.
+
+**Nicht enthalten / spätere Erweiterung:** WebRTC mit Kamera/Mikrofon, öffentliche Cloud-Räume, Datenbank-/Login-Infrastruktur, Zuschauer-Live-Video, Sponsorenkarussell, komplette Teilnehmerliste und Drittanbieter-Chat. Die tatsächliche Zoom-Übertragung auf Kundenhardware bleibt Abnahmevoraussetzung.

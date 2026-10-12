@@ -1,7 +1,0 @@
-node_modules/
-data/*
-!data/.gitkeep
-*.log
-.DS_Store
-.env
-qa-output/

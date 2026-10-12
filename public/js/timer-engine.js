@@ -1,4 +1,5 @@
-/** Timer calculation shared unchanged by the HTTP server and browser overlay. No dependencies. */
+import {parseWorkoutFormula} from './formula-v2.js';
+/** Timer calculation shared by the HTTP server and browser overlay. No runtime dependencies. */
 export const DEFAULT_TIMER_SETTINGS = Object.freeze({
   mode: 'intervals',
   durationSec: 600,
@@ -6,10 +7,15 @@ export const DEFAULT_TIMER_SETTINGS = Object.freeze({
   rounds: 5,
   workSec: 60,
   restSec: 20,
+  emomSec: 60,
+  emomRounds: 10,
   restLast: false,
   timeCapSec: 0,
   formula: '2m + 30 + 1:00',
   sound: true,
+  beepVolume: 70,
+  yellowSec: 10,
+  redSec: 3,
   trafficLights: true,
   fontSize: 150,
   primaryColor: '#7cfaab',
@@ -36,66 +42,15 @@ export function parseDuration(token) {
   return sec;
 }
 
-/** Accept 2m + 30 + 1:00 and nested repeats such as 4*(1m+30). */
+/** Legacy numeric durations retained for existing clients and saved backups. */
 export function parseFormula(input) {
-  const src = String(input ?? '').replace(/\s+/g, '').toLowerCase();
-  if (!src || src.length > 500) throw new Error('Formula must be 1-500 characters');
-  let pos = 0;
-  function expr() {
-    let result = term();
-    while (src[pos] === '+') { pos++; result = result.concat(term()); check(result); }
-    return result;
-  }
-  function term() {
-    const start = pos;
-    const times = /^(\d+)\*/.exec(src.slice(pos));
-    if (times) {
-      const count = Number(times[1]);
-      if (count < 1 || count > 99) throw new Error('Repeat count must be 1-99');
-      pos += times[0].length;
-      let parts;
-      if (src[pos] === '(') {
-        pos++;
-        parts = expr();
-        if (src[pos] !== ')') throw new Error('Missing closing parenthesis');
-        pos++;
-      } else {
-        parts = [duration()];
-      }
-      const expanded = Array.from({length:count}, () => parts).flat();
-      check(expanded);
-      return expanded;
-    }
-    if (src[pos] === '(') {
-      pos++;
-      const parts = expr();
-      if (src[pos] !== ')') throw new Error('Missing closing parenthesis');
-      pos++;
-      return parts;
-    }
-    if (pos === start && src[pos] === ')') throw new Error('Unexpected parenthesis');
-    return [duration()];
-  }
-  function duration() {
-    const token = /^(?:\d{1,3}:\d{1,2}(?::\d{1,2})?|\d+(?:\.\d{1,2})?[smh]?)/.exec(src.slice(pos));
-    if (!token) throw new Error(`Expected time at position ${pos + 1}`);
-    pos += token[0].length;
-    return parseDuration(token[0]);
-  }
-  function check(parts) {
-    if (parts.length > LIMIT_SEGMENTS) throw new Error('Too many intervals (max 240)');
-    if (parts.reduce((a,b)=>a+b,0) > LIMIT_TOTAL_SEC) throw new Error('Sequence exceeds 24 hours');
-  }
-  const result = expr();
-  if (pos !== src.length) throw new Error(`Unexpected input at position ${pos + 1}`);
-  check(result);
-  return result;
+  return parseWorkoutFormula(input).map(p=>p.seconds);
 }
 
 const cleanInt = (v, min, max, fallback) => Number.isFinite(Number(v)) ? Math.max(min, Math.min(max, Math.round(Number(v)))) : fallback;
 export function normalizeTimerSettings(raw = {}) {
   const d = DEFAULT_TIMER_SETTINGS;
-  const mode = ['countdown','stopwatch','intervals','sequence'].includes(raw.mode) ? raw.mode : d.mode;
+  const mode = ['countdown','stopwatch','intervals','sequence','amrap','emom','tabata','fortime'].includes(raw.mode) ? raw.mode : d.mode;
   const hex = (val, def) => typeof val === 'string' && /^#[0-9a-fA-F]{6}$/.test(val) ? val : def;
   const config = {
     mode,
@@ -104,10 +59,15 @@ export function normalizeTimerSettings(raw = {}) {
     rounds:cleanInt(raw.rounds,1,99,d.rounds),
     workSec:cleanInt(raw.workSec,1,86400,d.workSec),
     restSec:cleanInt(raw.restSec,0,86400,d.restSec),
+    emomSec:cleanInt(raw.emomSec,1,3600,d.emomSec),
+    emomRounds:cleanInt(raw.emomRounds,1,99,d.emomRounds),
     restLast:typeof raw.restLast === 'boolean' ? raw.restLast : d.restLast,
     timeCapSec:cleanInt(raw.timeCapSec,0,86400,d.timeCapSec),
     formula:typeof raw.formula === 'string' ? raw.formula.slice(0,500) : d.formula,
     sound:typeof raw.sound === 'boolean' ? raw.sound : d.sound,
+    beepVolume:cleanInt(raw.beepVolume,0,100,d.beepVolume),
+    yellowSec:cleanInt(raw.yellowSec,0,60,d.yellowSec),
+    redSec:cleanInt(raw.redSec,0,60,d.redSec),
     trafficLights:typeof raw.trafficLights === 'boolean' ? raw.trafficLights : d.trafficLights,
     fontSize:cleanInt(raw.fontSize,70,240,d.fontSize),
     primaryColor:hex(raw.primaryColor,d.primaryColor),
@@ -123,19 +83,25 @@ export function buildTimeline(raw) {
   const c = normalizeTimerSettings(raw);
   let phases = [];
   if (c.leadSec) phases.push({type:'prepare', seconds:c.leadSec, index:0, count:1});
-  if (c.mode === 'countdown') phases.push({type:'work',seconds:c.durationSec,index:1,count:1});
-  if (c.mode === 'stopwatch') phases.push({type:'work',seconds:c.timeCapSec || Infinity,index:1,count:1});
+  if (c.mode === 'countdown' || c.mode === 'amrap') phases.push({type:'work',seconds:c.durationSec,index:1,count:1});
+  if (c.mode === 'stopwatch' || c.mode === 'fortime') phases.push({type:'work',seconds:c.timeCapSec || Infinity,index:1,count:1});
   if (c.mode === 'intervals') {
     for(let i=0;i<c.rounds;i++) {
       phases.push({type:'work',seconds:c.workSec,index:i+1,count:c.rounds});
       if (c.restSec && (c.restLast || i < c.rounds-1)) phases.push({type:'rest',seconds:c.restSec,index:i+1,count:c.rounds});
     }
   }
-  if (c.mode === 'sequence') {
-    const entries = parseFormula(c.formula);
-    entries.forEach((seconds,i)=>phases.push({type:'sequence',seconds,index:i+1,count:entries.length}));
+  if (c.mode === 'tabata') {
+    for(let i=0;i<8;i++){phases.push({type:'work',seconds:20,index:i+1,count:8});phases.push({type:'rest',seconds:10,index:i+1,count:8});}
   }
-  if (c.timeCapSec && c.mode !== 'stopwatch') {
+  if (c.mode === 'emom') {
+    for(let i=0;i<c.emomRounds;i++)phases.push({type:'work',seconds:c.emomSec,index:i+1,count:c.emomRounds});
+  }
+  if (c.mode === 'sequence') {
+    const entries = parseWorkoutFormula(c.formula);
+    entries.forEach(({seconds,type},i)=>phases.push({type,seconds,index:i+1,count:entries.length}));
+  }
+  if (c.timeCapSec && !['stopwatch','fortime'].includes(c.mode)) {
     const cap = c.timeCapSec + c.leadSec;
     let consumed = 0;
     phases = phases.flatMap(p => {
@@ -170,7 +136,7 @@ export function describeTimer(timer, settings, now=Date.now()) {
   if (!phase && timeline.segments.length) phase=timeline.segments[timeline.segments.length-1];
   let elapsedInPhase = phase ? Math.max(0,elapsedMs-phase.startMs):0;
   let remainingMs = phase ? Math.max(0,phase.durationMs-elapsedInPhase):0;
-  let countUp = settings.mode === 'stopwatch' && phase?.type === 'work';
+  let countUp = ['stopwatch','fortime'].includes(settings.mode) && phase?.type === 'work';
   let displayMs = countUp ? elapsedInPhase : remainingMs;
   let currentProgress = phase && Number.isFinite(phase.durationMs) ? Math.min(1,elapsedInPhase/phase.durationMs) : 0;
   return {status,phase,elapsedMs,remainingMs,displayMs,countUp,currentProgress,finished,timeline};

@@ -6,18 +6,18 @@ const FONT_OPTIONS = ['sans','condensed','serif','mono'];
 const ALIGN_OPTIONS = ['left','center','right'];
 export const DEFAULT_SETTINGS = {
   language:'de',
-  appearance: {leftWidth:25,rightWidth:30,panelOpacity:77,animations:true,hidePanelBackground:false,accentColor:'#7cfaab'},
+  appearance: {leftWidth:25,rightWidth:30,panelOpacity:77,animations:true,hidePanelBackground:false,accentColor:'#7cfaab',leftScrim:20,centerScrim:12,rightScrim:35,textShadow:true,clock24:true},
   left: {
     showLogo:true,logoDataUrl:'/sample-logo.png',showBrand:true,brand:'CROSSFIT / LIVE',
     showTitle:true,title:'THE DAILY GRIND',showSubtitle:true,subtitle:'STRENGTH · ENGINE · COMMUNITY',
-    showCustom:true,customText:'PUSH YOUR LIMITS.\nOWN EVERY REP.',
+    showCustom:true,customText:'PUSH YOUR LIMITS.\nOWN EVERY REP.',showAthlete:true,athlete:'HEAT 1',
     font:'condensed',fontSize:62,color:'#f5f7fc',align:'left'
   },
   middle:{showTimer:true,showPhase:true,showRound:true,showProgress:true,showCaption:true,
     caption:'EVERY SECOND COUNTS',showTimeCap:true},
   right:{showWod:true,wodTitle:'TODAY’S WOD',wodText:'5 ROUNDS FOR TIME\n20 Air Squats\n15 Burpees\n10 Pull-ups',
     showCoach:true,coach:'COACH ALEX',showNotes:true,notes:'Move well. Scale smart.\nStay hydrated.',
-    showClock:true,font:'sans',fontSize:30,color:'#f5f7fc',align:'left'},
+    showClock:true,showSponsor:false,sponsorDataUrl:'',sponsorHeight:70,showTicker:false,tickerText:'NEXT CLASS 18:00',font:'sans',fontSize:30,color:'#f5f7fc',align:'left'},
   timerSettings:{...DEFAULT_TIMER_SETTINGS}
 };
 export const BUILTIN_SCENES = [
@@ -25,7 +25,13 @@ export const BUILTIN_SCENES = [
   {id:'preset-minimal',name:'Minimal',createdAt:'2026-01-01T00:00:00.000Z',settings:{...structuredClone(DEFAULT_SETTINGS),
     appearance:{...DEFAULT_SETTINGS.appearance,leftWidth:22,rightWidth:22,panelOpacity:52},
     left:{...DEFAULT_SETTINGS.left,showSubtitle:false,showCustom:false,title:'WOD LIVE'},
-    right:{...DEFAULT_SETTINGS.right,showNotes:false,showCoach:false}}}
+    right:{...DEFAULT_SETTINGS.right,showNotes:false,showCoach:false}}},
+  {id:'preset-timer-only',name:'Timer only',createdAt:'2026-01-01T00:00:00.000Z',settings:{...structuredClone(DEFAULT_SETTINGS),
+    appearance:{...DEFAULT_SETTINGS.appearance,leftWidth:18,rightWidth:18,leftScrim:0,centerScrim:40,rightScrim:0,panelOpacity:45},
+    left:{...DEFAULT_SETTINGS.left,showLogo:false,showBrand:false,showTitle:false,showSubtitle:false,showCustom:false,showAthlete:false},
+    right:{...DEFAULT_SETTINGS.right,showWod:false,showCoach:false,showNotes:false,showClock:false,showSponsor:false,showTicker:false},
+    middle:{...DEFAULT_SETTINGS.middle,showCaption:false},
+    timerSettings:{...DEFAULT_TIMER_SETTINGS,mode:'countdown',durationSec:180,leadSec:3}}}
 ];
 
 const str=(s,max,fallback='')=>typeof s==='string'?s.slice(0,max):fallback;
@@ -67,16 +73,17 @@ export function normalizeSettings(input={}) {
   const leftWidth=num(a.leftWidth,15,45,d.appearance.leftWidth);
   const rightWidth=Math.min(num(a.rightWidth,15,45,d.appearance.rightWidth),75-leftWidth);
   if(!validImageData(l.logoDataUrl)) throw new Error('Logo must be a PNG, JPEG or WebP smaller than 2 MB');
+  if(!validImageData(r.sponsorDataUrl)) throw new Error('Sponsor must be a PNG, JPEG or WebP smaller than 2 MB');
   return {
     language:choice(x.language,LANGUAGES,d.language),
     appearance:{leftWidth,rightWidth,panelOpacity:num(a.panelOpacity,0,95,77),
       animations:bool(a.animations,true),hidePanelBackground:bool(a.hidePanelBackground,false),
-      accentColor:color(a.accentColor,d.appearance.accentColor)},
+      accentColor:color(a.accentColor,d.appearance.accentColor),leftScrim:num(a.leftScrim,0,85,20),centerScrim:num(a.centerScrim,0,85,12),rightScrim:num(a.rightScrim,0,85,35),textShadow:bool(a.textShadow,true),clock24:bool(a.clock24,true)},
     left:{showLogo:bool(l.showLogo,true),logoDataUrl:l.logoDataUrl,
       showBrand:bool(l.showBrand,true),brand:str(l.brand,120),
       showTitle:bool(l.showTitle,true),title:str(l.title,150),
       showSubtitle:bool(l.showSubtitle,true),subtitle:str(l.subtitle,180),
-      showCustom:bool(l.showCustom,true),customText:str(l.customText,1500),
+      showCustom:bool(l.showCustom,true),customText:str(l.customText,1500),showAthlete:bool(l.showAthlete,true),athlete:str(l.athlete,120),
       font:choice(l.font,FONT_OPTIONS,'condensed'),fontSize:num(l.fontSize,24,120,62),
       color:color(l.color,'#f5f7fc'),align:choice(l.align,ALIGN_OPTIONS,'left')},
     middle:{showTimer:bool(m.showTimer,true),showPhase:bool(m.showPhase,true),
@@ -85,7 +92,7 @@ export function normalizeSettings(input={}) {
     right:{showWod:bool(r.showWod,true),wodTitle:str(r.wodTitle,120),wodText:str(r.wodText,2500),
       showCoach:bool(r.showCoach,true),coach:str(r.coach,120),
       showNotes:bool(r.showNotes,true),notes:str(r.notes,1000),
-      showClock:bool(r.showClock,true),font:choice(r.font,FONT_OPTIONS,'sans'),
+      showClock:bool(r.showClock,true),showSponsor:bool(r.showSponsor,false),sponsorDataUrl:r.sponsorDataUrl,sponsorHeight:num(r.sponsorHeight,35,140,70),showTicker:bool(r.showTicker,false),tickerText:str(r.tickerText,160),font:choice(r.font,FONT_OPTIONS,'sans'),
       fontSize:num(r.fontSize,18,80,30),color:color(r.color,'#f5f7fc'),
       align:choice(r.align,ALIGN_OPTIONS,'left')},
     timerSettings:normalizeTimerSettings(x.timerSettings)
@@ -96,6 +103,7 @@ export function createInitialData(){
   return {
     settings:normalizeSettings(DEFAULT_SETTINGS),
     timer:{status:'idle',elapsedMs:0,anchorMs:null},
-    scenes:structuredClone(BUILTIN_SCENES)
+    scenes:structuredClone(BUILTIN_SCENES),
+    activeSceneId:'preset-competition'
   };
 }

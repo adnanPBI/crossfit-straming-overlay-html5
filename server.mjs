@@ -63,14 +63,15 @@ export async function createAppServer(options={}) {
       data.settings=normalizeSettings(loaded.settings);
       if(validTimer(loaded.timer))data.timer=loaded.timer;
       if(Array.isArray(loaded.scenes))data.scenes=normalizeScenes(loaded.scenes);
+      if(typeof loaded.activeSceneId==='string' && data.scenes.some(s=>s.id===loaded.activeSceneId))data.activeSceneId=loaded.activeSceneId;
     } catch(e){console.warn('Stored data invalid; retaining defaults:',e.message);}
   }
   let clients=new Set();
   let writes=Promise.resolve();
   let revision=0;
-  const snapshot=()=>({settings:data.settings,timer:data.timer,scenes:data.scenes.map(s=>({id:s.id,name:s.name,createdAt:s.createdAt})),revision,serverNow:Date.now()});
+  const snapshot=()=>({settings:data.settings,timer:data.timer,scenes:data.scenes.map(s=>({id:s.id,name:s.name,createdAt:s.createdAt})),activeSceneId:data.activeSceneId??null,revision,serverNow:Date.now()});
   const persist=()=>{
-    const payload=JSON.stringify({settings:data.settings,timer:data.timer,scenes:data.scenes},null,2);
+    const payload=JSON.stringify({settings:data.settings,timer:data.timer,scenes:data.scenes,activeSceneId:data.activeSceneId},null,2);
     writes=writes.then(async()=>{
       const tmp=`${statePath}.tmp`;
       await writeFile(tmp,payload,{mode:0o600});
@@ -107,7 +108,7 @@ export async function createAppServer(options={}) {
       const pathname=url.pathname;
       if(pathname.startsWith('/api/')){
         if(req.method==='GET' && pathname==='/api/state') return send(res,200,snapshot());
-        if(req.method==='GET' && pathname==='/api/health')return send(res,200,{ok:true,version:'1.0.0',uptimeSeconds:Math.round(process.uptime())});
+        if(req.method==='GET' && pathname==='/api/health')return send(res,200,{ok:true,version:'1.1.0',uptimeSeconds:Math.round(process.uptime())});
         if(req.method==='GET' && pathname==='/api/events'){
           if(clients.size>=32)return err(res,503,'Too many overlay subscribers');
           res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform',Connection:'keep-alive','X-Accel-Buffering':'no'});
@@ -117,7 +118,7 @@ export async function createAppServer(options={}) {
         if(!hasCorrectKey(req,key))return err(res,401,'Control key required or incorrect');
         if(req.method==='POST' && pathname==='/api/auth')return send(res,200,{ok:true});
         if(req.method==='GET' && pathname==='/api/scenes')return send(res,200,{scenes:data.scenes.map(s=>({id:s.id,name:s.name,createdAt:s.createdAt}))});
-        if(req.method==='GET' && pathname==='/api/export')return send(res,200,{format:'crossfit-overlay-v1',settings:data.settings,scenes:data.scenes});
+        if(req.method==='GET' && pathname==='/api/export')return send(res,200,{format:'crossfit-overlay-v1',settings:data.settings,scenes:data.scenes,activeSceneId:data.activeSceneId});
         if(req.method==='PATCH' && pathname==='/api/settings'){
           const body=await jsonBody(req);
           if(!body || !body.patch || typeof body.patch!=='object' || Array.isArray(body.patch))return err(res,400,'Expected patch object');
@@ -125,6 +126,7 @@ export async function createAppServer(options={}) {
           const timerChanged=JSON.stringify(next.timerSettings)!==JSON.stringify(data.settings.timerSettings);
           data.settings=next;
           if(timerChanged)data.timer={status:'idle',elapsedMs:0,anchorMs:null};
+          data.activeSceneId=null;
           await commit();return send(res,200,snapshot());
         }
         if(req.method==='POST' && pathname==='/api/timer'){
@@ -139,10 +141,13 @@ export async function createAppServer(options={}) {
             data.timer={status:'paused',elapsedMs:desc.elapsedMs,anchorMs:null};
           }else if(action==='reset'){
             data.timer={status:'idle',elapsedMs:0,anchorMs:null};
-          }else if(action==='next'){
-            const next=desc.timeline.segments.find((p)=>p.startMs>desc.elapsedMs+1);
-            if(!next)return err(res,400,'No next segment');
-            data.timer={status:t.status==='running'?'running':'paused',elapsedMs:next.startMs,anchorMs:t.status==='running'?now:null};
+          }else if(action==='next' || action==='previous'){
+            const segments=desc.timeline.segments;
+            const target=action==='next'
+              ? segments.find(p=>p.startMs>desc.elapsedMs+1)
+              : [...segments].reverse().find(p=>p.startMs<desc.elapsedMs-350);
+            if(!target)return err(res,400,action==='next'?'No next segment':'No previous segment');
+            data.timer={status:t.status==='running'?'running':'paused',elapsedMs:target.startMs,anchorMs:t.status==='running'?now:null};
           }else{return err(res,400,'Unknown timer action');}
           await commit();return send(res,200,snapshot());
         }
@@ -151,13 +156,14 @@ export async function createAppServer(options={}) {
           if(!name)return err(res,400,'Scene name required');
           if(data.scenes.length>=MAX_SCENES)return err(res,400,'Maximum 20 scenes');
           const scene={id:crypto.randomUUID(),name,createdAt:new Date().toISOString(),settings:structuredClone(data.settings)};
-          data.scenes.push(scene);await commit();return send(res,201,{scene:{id:scene.id,name:scene.name,createdAt:scene.createdAt}});
+          data.scenes.push(scene);data.activeSceneId=scene.id;await commit();return send(res,201,{scene:{id:scene.id,name:scene.name,createdAt:scene.createdAt}});
         }
         if(req.method==='POST' && pathname==='/api/scenes/load'){
           const body=await jsonBody(req);
           const scene=data.scenes.find(s=>s.id===body?.id);
           if(!scene)return err(res,404,'Scene not found');
           data.settings=normalizeSettings(scene.settings);
+          data.activeSceneId=scene.id;
           data.timer={status:'idle',elapsedMs:0,anchorMs:null};
           await commit();return send(res,200,snapshot());
         }
@@ -166,10 +172,11 @@ export async function createAppServer(options={}) {
           if(id.startsWith('preset-'))return err(res,403,'Built-in presets cannot be deleted');
           const index=data.scenes.findIndex(s=>s.id===id);
           if(index<0)return err(res,404,'Scene not found');
-          data.scenes.splice(index,1);await commit();return send(res,200,{ok:true});
+          data.scenes.splice(index,1);if(data.activeSceneId===id)data.activeSceneId=null;await commit();return send(res,200,{ok:true});
         }
         if(req.method==='POST' && pathname==='/api/defaults'){
           data.settings=normalizeSettings(DEFAULT_SETTINGS);
+          data.activeSceneId='preset-competition';
           data.timer={status:'idle',elapsedMs:0,anchorMs:null};
           await commit();return send(res,200,snapshot());
         }
@@ -180,13 +187,14 @@ export async function createAppServer(options={}) {
           if(!Array.isArray(body.scenes))return err(res,400,'Missing scenes');
           const nextScenes=normalizeScenes(body.scenes);
           data.settings=nextSettings;data.scenes=nextScenes;
+          data.activeSceneId=typeof body.activeSceneId==='string' && nextScenes.some(s=>s.id===body.activeSceneId)?body.activeSceneId:null;
           data.timer={status:'idle',elapsedMs:0,anchorMs:null};
           await commit();return send(res,200,snapshot());
         }
         return err(res,404,'API route not found');
       }
       if(req.method!=='GET' && req.method!=='HEAD')return err(res,405,'Method not allowed');
-      const route={'/':'/index.html','/control':'/control.html','/overlay':'/overlay.html'}[pathname]??pathname;
+      const route={'/':'/index.html','/control':'/control.html','/overlay':'/overlay.html','/remote':'/remote.html'}[pathname]??pathname;
       const decoded=decodeURIComponent(route);
       const resolved=path.resolve(PUBLIC,`.${decoded}`);
       if(!resolved.startsWith(PUBLIC+path.sep) && resolved!==PUBLIC)return err(res,403,'Forbidden');
@@ -230,9 +238,10 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
   console.log('\n  ===== WOD STREAM STUDIO =====');
   console.log(`  Control: ${local}/control`);
   console.log(`  Overlay: ${local}/overlay`);
+  console.log(`  Mobile remote: ${local}/remote`);
   console.log(`  Control key: ${app.controlKey}`);
   for(const inf of Object.values(os.networkInterfaces()).flat()) {
-    if(inf && inf.family==='IPv4' && !inf.internal)console.log(`  Phone (same Wi-Fi): http://${inf.address}:${app.port}/control`);
+    if(inf && inf.family==='IPv4' && !inf.internal)console.log(`  Phone (same Wi-Fi): http://${inf.address}:${app.port}/remote`);
   }
   console.log('  For private/trusted local networks only; see SECURITY.md.\n');
   const shutdown=()=>{app.close().then(()=>process.exit(0));};

@@ -61,6 +61,11 @@ jobs:
             sleep 5
           done
           node --input-type=module -e 'import fs from "node:fs";const h=JSON.parse(fs.readFileSync("health.json","utf8")); if(!h.ok||h.mode!=="netlify")process.exit(1);console.log("Health verified",h);'
+          # Guard against successful deployments with a broken site root.
+          curl -fsS --max-time 20 "$SITE_URL/" > homepage.html
+          node --input-type=module -e 'import fs from "node:fs";const s=fs.readFileSync("homepage.html","utf8");if(!s.includes("WOD Stream Studio")||!s.includes("href=\"/control\""))throw Error("Homepage missing or not linked to control panel");console.log("Homepage verified");'
+          curl -fsS --max-time 20 "$SITE_URL/sample-logo.png" > sample-logo-check.png
+          node --input-type=module -e 'import fs from "node:fs";const a=fs.readFileSync("sample-logo-check.png");if(a.length<32||a.subarray(0,8).toString("hex")!=="89504e470d0a1a0a")throw Error("Default logo missing");console.log("Logo asset verified");'
           curl -fsS --max-time 20 "$SITE_URL/control" > /dev/null
           curl -fsS --max-time 20 "$SITE_URL/remote" > /dev/null
           curl -fsS --max-time 20 "$SITE_URL/overlay" > /dev/null

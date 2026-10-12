@@ -1,0 +1,72 @@
+name: Deploy WOD Stream Studio to Netlify
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wod-netlify-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Netlify dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run regression tests
+        run: npm test && npm run check
+      - name: Find or create Netlify site
+        id: site
+        env:
+          NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
+          NETLIFY_SITE_NAME: wod-studio-1415661536
+        run: node scripts/netlify-site.mjs
+      - name: Configure private control key, if supplied
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
+          SITE_ID: ${{ steps.site.outputs.site_id }}
+          CONTROL_KEY: ${{ secrets.OVERLAY_CONTROL_KEY }}
+        run: |
+          if [ -n "$CONTROL_KEY" ]; then
+            if [ "${#CONTROL_KEY}" -lt 12 ]; then echo 'OVERLAY_CONTROL_KEY must be at least 12 characters' >&2; exit 1; fi
+            echo '::add-mask::'$CONTROL_KEY
+            ./node_modules/.bin/netlify env:set OVERLAY_CONTROL_KEY "$CONTROL_KEY" --context production --scope functions --secret --site "$SITE_ID" --auth "$NETLIFY_AUTH_TOKEN" --force
+            echo 'Remote control authentication configured.'
+          else
+            echo 'OVERLAY_CONTROL_KEY secret not found: publishing read-only overlay until it is configured.'
+          fi
+      - name: Deploy static UI and serverless functions
+        id: publish
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
+          SITE_ID: ${{ steps.site.outputs.site_id }}
+        run: |
+          ./node_modules/.bin/netlify deploy --prod --site "$SITE_ID" --dir=public --functions=netlify/functions --message "WOD Studio ${GITHUB_SHA}" --json > netlify-deploy.json
+          node -e 'const d=require("./netlify-deploy.json"); console.log("Production URL:", d.website_url||d.deploy_url||d.url||"unknown");'
+      - name: Verify site and API
+        env:
+          SITE_URL: ${{ steps.site.outputs.site_url }}
+        run: |
+          set -e
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 20 "$SITE_URL/api/health" > health.json; then break; fi
+            sleep 5
+          done
+          node --input-type=module -e 'import fs from "node:fs";const h=JSON.parse(fs.readFileSync("health.json","utf8")); if(!h.ok||h.mode!=="netlify")process.exit(1);console.log("Health verified",h);'
+          curl -fsS --max-time 20 "$SITE_URL/control" > /dev/null
+          curl -fsS --max-time 20 "$SITE_URL/remote" > /dev/null
+          curl -fsS --max-time 20 "$SITE_URL/overlay" > /dev/null
+      - name: Deployment link
+        if: always()
+        env:
+          SITE_URL: ${{ steps.site.outputs.site_url }}
+        run: |
+          printf '\n### WOD Stream Studio Netlify deploy\n\n- Site: %s\n- Control: %s/control\n- Overlay: %s/overlay\n- Phone: %s/remote\n' "$SITE_URL" "$SITE_URL" "$SITE_URL" "$SITE_URL" >> "$GITHUB_STEP_SUMMARY"

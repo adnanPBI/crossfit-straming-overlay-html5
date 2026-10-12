@@ -82,3 +82,7 @@ Details: `docs/ARCHITECTURE-AND-EXTENSION.md`, `docs/SECURITY.md`, `docs/SELF-HO
 - Browser autoplay/audio permissions differ. Video via OBS Virtual Camera and audio into Zoom require separate acceptance.
 - Full participant rosters, rotating sponsor logos, external live chat, WebRTC camera/mic streaming, and public cloud rooms remain **future extensions**. A single heat/athlete label, a single sponsor logo and event ticker **are included**.
 - No bundled OBS or Zoom installers, commercial fonts, or licenses.
+
+## Netlify deployment
+
+Production GitHub Actions workflow: `.github/workflows/deploy-netlify.yml`. See [docs/NETLIFY-DEPLOYMENT.md](docs/NETLIFY-DEPLOYMENT.md). Hosted remote editing requires an `OVERLAY_CONTROL_KEY` GitHub Actions repository secret distinct from the existing `NETLIFY_TOKEN`. Netlify mode stores scenes in Netlify Blobs and syncs screens by polling; local mode keeps the original event stream.

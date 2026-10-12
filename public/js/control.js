@@ -1,4 +1,4 @@
-import {Api,beep} from './api.js';
+import {Api,beep,subscribeSnapshots} from './api.js';
 import {describeTimer,formatClock} from './timer-engine.js';
 import {t,translateDocument} from './i18n.js';
 
@@ -270,13 +270,8 @@ function setupButtons(){
     else if(key==='b'){$('#prevBtn').click();}
   });
 }
-function connectStream(){
-  const events=new EventSource('/api/events');
-  events.addEventListener('snapshot',(event)=>{
-    try{applySnapshot(JSON.parse(event.data));setConnected(true);}catch(e){console.warn('Invalid SSE snapshot',e);}
-  });
-  events.addEventListener('open',()=>setConnected(true));
-  events.addEventListener('error',()=>setConnected(false));
+async function connectStream(){
+  return subscribeSnapshots(data=>applySnapshot(data),connected=>setConnected(connected));
 }
 
 async function start(){

@@ -1,6 +1,6 @@
 import {describeTimer,formatClock} from './timer-engine.js';
 import {localeTag,t} from './i18n.js';
-import {beep} from './api.js';
+import {beep,subscribeSnapshots} from './api.js';
 
 const $=(id)=>document.getElementById(id);
 const stage=$('stage');
@@ -135,11 +135,7 @@ async function start(){
     if(!response.ok)throw new Error('Server unavailable');
     applySnapshot(await response.json());
   }catch(e){console.warn('Initial state unavailable:',e);}
-  const eventSource=new EventSource('/api/events');
-  eventSource.addEventListener('snapshot',(event)=>{
-    try{applySnapshot(JSON.parse(event.data));}catch(e){console.warn('Bad stream update',e);}
-  });
-  eventSource.addEventListener('error',()=>console.warn('Overlay sync reconnecting'));
+  await subscribeSnapshots(data=>applySnapshot(data),online=>{if(!online)console.warn('Overlay waiting for server');});
   setInterval(tick,90);
 }
 void start();

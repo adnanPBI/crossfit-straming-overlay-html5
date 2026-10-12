@@ -1,4 +1,4 @@
-import {Api} from './api.js';
+import {Api,subscribeSnapshots} from './api.js';
 import {describeTimer,formatClock} from './timer-engine.js';
 import {t,translateDocument} from './i18n.js';
 const api=new Api();
@@ -75,10 +75,7 @@ async function main(){
     else if(key==='n')$('nextBtn').click();
     else if(key==='b')$('previousBtn').click();
   });
-  const stream=new EventSource('/api/events');
-  stream.addEventListener('snapshot',event=>{try{snapshot(JSON.parse(event.data));online(true);}catch{online(false);}});
-  stream.addEventListener('open',()=>online(true));
-  stream.addEventListener('error',()=>online(false));
+  await subscribeSnapshots(value=>snapshot(value),value=>online(value));
   setInterval(tick,100);
 }
 void main();

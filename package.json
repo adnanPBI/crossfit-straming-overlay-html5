@@ -1,15 +1,22 @@
 {
   "name": "crossfit-stream-overlay",
   "private": true,
-  "version": "1.1.0",
-  "description": "Self-hosted multilingual, three-zone live workout overlay and remote controller for OBS / Zoom",
+  "version": "1.2.0",
+  "description": "Self-hosted and Netlify-deployable multilingual CrossFit OBS overlay",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check server.mjs && node --check public/js/control.js && node --check public/js/overlay.js && node --check public/js/remote.js && node --check public/js/formula-v2.js"
+    "check": "node --check server.mjs && node --check public/js/control.js && node --check public/js/overlay.js && node --check public/js/remote.js && node --check public/js/formula-v2.js && node --check netlify/api-core.mjs && node --check netlify/functions/api.mjs"
   },
   "license": "SEE LICENSE-AND-RIGHTS.md",
-  "dependencies": {}
+  "dependencies": {
+    "@netlify/blobs": "11.1.4"
+  },
+  "devDependencies": {
+    "netlify-cli": "27.12.0"
+  }
 }

@@ -32,3 +32,29 @@ export function beep(frequency=760,duration=0.12,volume=0.7){
     osc.onended=()=>void ctx.close();
   }catch(e){console.warn('Audio beep unavailable',e);}
 }
+
+/** Netlify functions cannot hold open EventSource connections. Use low-frequency
+ * snapshots on Netlify while preserving realtime SSE on the local server. */
+export async function subscribeSnapshots(onSnapshot,onConnection=()=>{},intervalMs=2400){
+  let mode='local';
+  try{const r=await fetch('/api/health',{cache:'no-store'});if(r.ok)mode=(await r.json()).mode||'local';else mode='netlify';}
+  catch{mode='netlify';}
+  if(mode==='netlify'){
+    let busy=false;
+    const poll=async()=>{
+      if(busy)return;
+      busy=true;
+      try{const r=await fetch('/api/state',{cache:'no-store'});if(!r.ok)throw Error('Snapshot unavailable');onSnapshot(await r.json());onConnection(true);}
+      catch{onConnection(false);}
+      finally{busy=false;}
+    };
+    void poll();
+    const timer=setInterval(()=>void poll(),intervalMs);
+    return ()=>clearInterval(timer);
+  }
+  const stream=new EventSource('/api/events');
+  stream.addEventListener('snapshot',e=>{try{onSnapshot(JSON.parse(e.data));onConnection(true);}catch{onConnection(false);}});
+  stream.addEventListener('open',()=>onConnection(true));
+  stream.addEventListener('error',()=>onConnection(false));
+  return ()=>stream.close();
+}

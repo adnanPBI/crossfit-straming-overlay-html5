@@ -10,7 +10,10 @@ async function request(path,opts={}){
   const body=await res.text();let json={};try{json=JSON.parse(body);}catch{}
   return {status:res.status,ok:res.ok,data:json};
 }
-let site=await request(`/sites/${name}`);
+// Netlify's Get Site API accepts a UUID or full domain, not a bare site name.
+// A bare name triggers a false 404 followed by a duplicate-name 422 on redeploy.
+const siteSelector=process.env.NETLIFY_SITE_ID||`${name}.netlify.app`;
+let site=await request(`/sites/${encodeURIComponent(siteSelector)}`);
 if(site.status===404){
   site=await request('/sites',{method:'POST',body:JSON.stringify({name,force_ssl:true})});
   if(!site.ok){console.error(`Could not create Netlify site: HTTP ${site.status}, ${site.data?.message||'API error'}`);process.exit(1);}

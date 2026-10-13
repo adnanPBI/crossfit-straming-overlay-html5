@@ -1,6 +1,6 @@
 # WOD Stream Studio — multilingual CrossFit/workout broadcast overlay
 
-Version 1.1.0 — ready-to-run source project. No build step, package installation, cloud account, paid library, or license server is required.
+Version 2.0.0 — Arena broadcast edition. Local Node hosting needs no paid packages or external account; hosted Netlify mode uses MIT-licensed `@netlify/blobs` and CI uses the MIT-licensed `netlify-cli`. Hosted function/Blob usage may incur Netlify charges according to your account plan.
 
 ## What you get
 
@@ -14,7 +14,7 @@ Version 1.1.0 — ready-to-run source project. No build step, package installati
 - Broadcast polish from the Grok-workspace review: **athlete/heat overlay, sponsor image, scrolling ticker, zone scrims, drop shadows, configurable 12/24-hour clock**, quick mode chips, and **black/chroma-green background URLs** for Zoom.
 - Separate compact **`/remote`** control deck optimized for phones/tablets, with secure scene switching and previous/next interval buttons.
 - UI and timer labels in **German, English, French, Spanish, Italian and Portuguese**; user-entered WOD/branding stays in the original language.
-- Source code: native HTML5, CSS3, ECMAScript modules, Node.js standard library. Zero `npm` dependencies.
+- Source code: native HTML5, CSS3, ECMAScript modules, Node.js standard library. Zero runtime npm dependencies in local Node mode; Netlify requires `@netlify/blobs`.
 
 ## Run now
 
@@ -77,12 +77,16 @@ Details: `docs/ARCHITECTURE-AND-EXTENSION.md`, `docs/SECURITY.md`, `docs/SELF-HO
 
 ## Known limitations / acceptance boundary
 
-- Phone control is **LAN-only**, not an Internet cloud account service. It requires the host machine online and reachable.
+- Phone control is **LAN-local when self-hosted** or available **over HTTPS on Netlify** after entering the control key. Netlify pages poll approximately every 2.4 seconds; last-write-wins storage means a single authoritative show operator is recommended.
 - The overlay supports standard OBS Browser Source and is architected for Streamlabs Browser Source. Hardware/OS-specific OBS, Streamlabs and Zoom testing must be completed on the client's setup; **this repository does not claim a successful physical Zoom call**.
 - Browser autoplay/audio permissions differ. Video via OBS Virtual Camera and audio into Zoom require separate acceptance.
 - Full participant rosters, rotating sponsor logos, external live chat, WebRTC camera/mic streaming, and public cloud rooms remain **future extensions**. A single heat/athlete label, a single sponsor logo and event ticker **are included**.
 - No bundled OBS or Zoom installers, commercial fonts, or licenses.
 
-## Netlify deployment
+## Release 2.0 — Broadcast Arena, backup and acceptance
 
-Production GitHub Actions workflow: `.github/workflows/deploy-netlify.yml`. See [docs/NETLIFY-DEPLOYMENT.md](docs/NETLIFY-DEPLOYMENT.md). Hosted remote editing requires an `OVERLAY_CONTROL_KEY` GitHub Actions repository secret distinct from the existing `NETLIFY_TOKEN`. Netlify mode stores scenes in Netlify Blobs and syncs screens by polling; local mode keeps the original event stream.
+- **Arena** default: compact three-zone graphic composition in the upper part of a transparent 1920×1080 video canvas, circular progress timer and next-phase label. Change to **Glass** or **Minimal** in Layout.
+- **Backup v2** deduplicates identical embedded logo images across scenes; legacy v1 import supported. Hosted restore size limit is **5.4 MB** for JSON, also subject to Netlify's 6 MB buffered function payload limit; local Node importer supports 60 MB.
+- **Automated Netlify QA** uses isolated `X-Wod-QA-Run` namespace and checks saved scenes, timer commands, logo backup and persistence across redeployment without mutating active production scenes. Check the final Actions run for exact test results.
+- **Rights / licenses**: See `docs/LICENSE-RECONCILIATION.md` and `docs/RIGHTS-HANDOVER-TEMPLATE-DE-EN.md`. The Git history includes a GNU GPLv3 LICENSE; exclusive rights must be legally established, not assumed. MIT-licensed direct Netlify packages remain third party.
+- **Hands-on streaming**: OBS / Zoom / phone / sound acceptance requires client hardware, camera and a consented Zoom witness. `docs/STREAMING-ACCEPTANCE-DE.md` and `docs/RELEASE-ACCEPTANCE-V2.md` provide the protocol. Automated tests or offline screenshots **do not prove** a real OBS capture or Zoom call.

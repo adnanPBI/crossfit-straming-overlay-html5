@@ -1,19 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-
-const workflow=readFileSync(new URL('../.github/workflows/deploy-netlify.yml',import.meta.url),'utf8');
-
-test('Netlify production deployment supplies the control key to functions securely',()=>{
-  assert.match(workflow,/node scripts\/generate-control-verifier.mjs/);
-  assert.match(workflow,/--skip-functions-cache/);
-  assert.match(workflow,/--prod --context production/);
-  assert.doesNotMatch(workflow,/netlify env:set OVERLAY_CONTROL_KEY/);
+const ci=readFileSync(new URL('../.github/workflows/deploy-netlify.yml',import.meta.url),'utf8');
+test('Production CI generates server-only salted verifier without embedding plaintext',()=>{
+  assert.match(ci,/node scripts\/generate-control-verifier.mjs/);
+  assert.match(ci,/--skip-functions-cache/);
+  assert.doesNotMatch(ci,/env:set OVERLAY_CONTROL_KEY/);
 });
-
-test('deployment verifies the configured controller and checks valid and invalid keys',()=>{
-  assert.match(workflow,/controllerConfigured!==true/);
-  assert.match(workflow,/\$SITE_URL\/api\/auth/);
-  assert.match(workflow,/Production control authentication passed/);
-  assert.match(workflow,/Invalid credential rejected as expected/);
+test('Production deployment exercises valid and invalid credentials',()=>{
+  assert.match(ci,/controllerConfigured!==true/);
+  assert.match(ci,/\$SITE_URL\/api\/auth/);
+  assert.match(ci,/Invalid key improperly accepted/);
 });

@@ -1,34 +1,30 @@
-# Source handover, licensing, dependencies and proposed rights clause
+# WOD Stream Studio — source rights and license statement (v2.0)
+
+**This is an inventory and proposed handover, not a signed assignment.** The repository has contained a top-level GNU GPL version 3 `LICENSE`; earlier GPL permissions cannot automatically be withdrawn from prior recipients. Current copyright ownership and which files are subject to GPLv3 must be resolved before promising exclusive economic rights to a specific customer. Do not remove historical provenance or present a draft agreement as a completed transfer.
 
 ## Source supplied
 
-The distributable ZIP contains the unminified/unobfuscated original HTML, CSS, JavaScript, Node.js runtime code, configuration example, batch/shell launchers, example logo asset, source tests and guides. There is **no remote developer account dependency**, licensing callback, tracking script, paid runtime library or mandatory external API.
+The repository/source ZIP includes unminified HTML/CSS/JavaScript, ES modules, Node.js server, Netlify Functions, timer parser, local and remote interfaces, logos, tests and handover guides. The self-hosted Node mode can run on a third-party server without using any developer-controlled account. The optional Netlify mode requires a customer-controlled Netlify account and owner-controlled GitHub Actions credentials. No hidden license server is called.
 
-The source in this delivery may be copied, stored, executed and modified by the recipient for purposes of evaluating and operating the delivered project. No subscription/license fee is imposed by this software's authoring package. The recipient may transfer or deploy the files to its own private computer/server.
+## Existing components
 
-## Proposed contractual clause for a signed client agreement
+| Item | Ownership/license | Included runtime requirement |
+|---|---|---|
+| Repository `LICENSE` | GNU GPLv3 license text; identify scope/provenance per file | Clarification required |
+| Custom HTML/CSS/JS modules | Original contributors to be established | Yes |
+| `@netlify/blobs@11.1.4` | MIT; third party | Netlify only |
+| `netlify-cli@27.12.0` | MIT; third party | CI / deployment only |
+| Node.js built-ins and platform Web APIs | Node and browser platform licenses | Local server and browser |
+| OBS Studio | GNU GPL (external program) | Optional to composite video |
+| Zoom / Streamlabs | Vendor terms | Optional external software |
+| Fonts | System/platform fonts, not distributed | Platform-supplied |
+| `sample-logo.png` | Generic demo illustration in the project | Optional |
+| Contestant screenshots | Third-party design references only | Not bundled, not licensed here |
 
-> Upon receipt of the full agreed fixed fee (maximum 200 € for the defined scope), the developer shall deliver all native readable project/source/configuration/asset/documentation files and assign or grant to the client, to the extent permitted by applicable law and only insofar as the developer possesses such rights, the exclusive transferable economic exploitation rights in the **specifically commissioned original custom code**. The client may use, reproduce, modify, adapt, redevelop, maintain, deploy and engage any third party for further development without permission from, ongoing fees to, or accounts controlled by the developer. Any moral rights, statutory restrictions, or other nonassignable rights shall be handled according to the governing law. Existing third-party runtimes, frameworks, libraries, trademarks, third-party content and separately owned components are expressly excluded from any exclusivity claim. No additional licenses or charges are implied without written agreement.
+All third-party licenses and historical GPL-covered grants remain in force. The owner is responsible for permission to use any uploaded music, branding, participant names or sponsor artwork.
 
-**Important:** This is a **draft contractual formulation**, not a signed transfer certificate, proof of payment, legal opinion, or guarantee of copyright exclusivity in AI-assisted output. For a binding exclusive assignment, the contracting parties must complete and sign a rights agreement according to the applicable jurisdiction and accurately identify what the developer owns and can assign.
+## Rights and fixed-price scope
 
-## Third-party software and asset inventory
+The 200 EUR proposal is 20 EUR concept / 70 EUR prototype / 70 EUR expansions / 40 EUR testing and handover, payable after accepted milestones as agreed in writing. A conditional exclusive-rights transfer is possible only for specifically identified commissioned original rights the developer legally owns, subject to applicable law, prior GPL grants, third-party code and signed terms. Neither payment nor transfer can be inferred from the repository or this document.
 
-| Item | Bundled? | License/ownership | Cost to core app |
-| --- | --- | --- | --- |
-| Node.js executable | No | Node.js Open Source project; runtime license at nodejs.org/LICENSE | Free to install |
-| Node.js built-in `http`, `fs`, `crypto`, `os`, etc. | Runtime only | Node.js project's license terms | No extra license |
-| Web platform APIs: DOM, HTML, CSS, WebAudio, SSE | Browser-provided | Implemented by the browser | No extra license |
-| OBS Studio | No | Open-source GPL license, under OBS project's terms | Free |
-| Streamlabs Desktop | No | Separate application/provider terms apply | Not required |
-| Zoom Desktop | No | Zoom provider/service terms apply | Not required except Zoom delivery |
-| `public/sample-logo.png` | Yes | Project-created generic illustration and text | No runtime royalty |
-| System fonts (Segoe UI, Arial, Impact, etc.) | Not distributed | OS/platform-provided fonts; existing font licensing applies | No bundled license |
-| npm runtime dependencies | None | `package.json` dependencies is `{}` | 0 € |
-| Optional Python Playwright in QA | Not bundled | Separately install/test; Playwright project license applies | No runtime role |
-
-No font binary files are included. The user is responsible for rights to any logos, names, screenshots, music, sponsor material or other media **uploaded later**.
-
-## Scope exclusions
-
-The package does not promise copyright transfer in underlying web standards, Node.js, OBS, Zoom, generic ideas, preexisting third-party source, user-supplied logos, or trademarks (including CrossFit). Internet hosting, public authentication, professional audio routing and SaaS accounts are not part of the local-only core deliverable. See `docs/SCOPE-AND-BUDGET-DE.md` for itemized inclusions and limitations.
+See `docs/LICENSE-RECONCILIATION.md`, `docs/RIGHTS-HANDOVER-TEMPLATE-DE-EN.md` and `docs/RELEASE-ACCEPTANCE-V2.md` for provenance questions, contract signing fields and evidence gates.

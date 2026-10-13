@@ -35,6 +35,7 @@ function settingsChanged(settings){
     '--scrim-center':a.centerScrim/100,
     '--scrim-right':a.rightScrim/100
   });
+  stage.dataset.broadcastStyle=a.broadcastStyle||'arena';
   stage.classList.toggle('no-panel-bg',a.hidePanelBackground);
   stage.classList.toggle('no-animation',!a.animations);
   stage.classList.toggle('no-text-shadow',!a.textShadow);
@@ -89,7 +90,7 @@ function tick(){
     const timerNode=$('timerBig');
     const baseSize=settings.timerSettings.fontSize;
     timerNode.style.fontSize=`${baseSize}px`;
-    const available=Math.max(80,$('middleZone').clientWidth-90);
+    const available=Math.max(80,Math.min($('middleZone').clientWidth-90,$('timerOrbit').clientWidth-48));
     const textWidth=timerNode.getBoundingClientRect().width;
     if(textWidth>available)timerNode.style.fontSize=`${Math.max(32,Math.floor(baseSize*available/textWidth))}px`;
     previousClockText=clockText;
@@ -97,6 +98,14 @@ function tick(){
   if(phase && phase.type!=='prepare')setText('roundLabel',`${t(lang,'roundLabel')} ${String(phase.index).padStart(2,'0')} / ${String(phase.count).padStart(2,'0')}`);
   else setText('roundLabel',t(lang,'standby'));
   const percent=Math.min(100,Math.max(0,Math.round(d.currentProgress*100)));
+  const orbit=$('timerOrbit');
+  orbit.style.setProperty('--ring-angle',`${Math.round(d.currentProgress*360)}deg`);
+  show($('orbitFoot'),settings.middle.showPhase);
+  setText('orbitFoot',title);
+  const upcoming=phase?d.timeline.segments.find(x=>x.startMs>=phase.endMs && x.startMs>phase.startMs):null;
+  const showNext=!!upcoming && d.status!=='finished' && !!settings.middle.showPhase;
+  show($('nextPhaseBadge'),showNext);
+  if(showNext)setText('nextPhaseBadge',`${t(lang,'next').toUpperCase()}  ·  ${t(lang,upcoming.type==='sequence'?'sequencePhase':upcoming.type)}  ${formatClock(upcoming.durationMs)}`);
   $('progressFill').style.width=`${percent}%`;
   setText('progressPercent',`${percent}%`);
   let color=settings.timerSettings.primaryColor;

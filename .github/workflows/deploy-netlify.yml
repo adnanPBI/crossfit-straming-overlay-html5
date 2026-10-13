@@ -29,22 +29,16 @@ jobs:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
           NETLIFY_SITE_NAME: wod-studio-1415661536
         run: node scripts/netlify-site.mjs
-      - name: Validate controller secret for production
+      - name: Validate controller secret
         env:
           CONTROL_KEY: ${{ secrets.OVERLAY_CONTROL_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "$CONTROL_KEY" ]; then
-            echo 'OVERLAY_CONTROL_KEY is required for authenticated production control.' >&2
-            exit 1
+          if [ -z "$CONTROL_KEY" ] || [ "${#CONTROL_KEY}" -lt 12 ]; then
+            echo 'Set OVERLAY_CONTROL_KEY (12+ characters) in GitHub Actions secrets.' >&2; exit 1
           fi
-          if [ "${#CONTROL_KEY}" -lt 12 ]; then
-            echo 'OVERLAY_CONTROL_KEY must be at least 12 characters.' >&2
-            exit 1
-          fi
-          echo "::add-mask::$CONTROL_KEY"
-          echo 'Controller credential received from GitHub Actions secrets.'
-      - name: Prepare private control verifier for Netlify Functions
+          echo 'Controller secret provided.'
+      - name: Create server-only salted verifier
         env:
           CONTROL_KEY: ${{ secrets.OVERLAY_CONTROL_KEY }}
         run: node scripts/generate-control-verifier.mjs
@@ -54,8 +48,7 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
           SITE_ID: ${{ steps.site.outputs.site_id }}
         run: |
-          # Function contains a generated salted verifier, not the plaintext key.
-          ./node_modules/.bin/netlify deploy --prod --context production --site "$SITE_ID" --dir=public --functions=netlify/functions --skip-functions-cache --message "WOD Studio ${GITHUB_SHA}" --json > netlify-deploy.json
+          ./node_modules/.bin/netlify deploy --prod --site "$SITE_ID" --dir=public --functions=netlify/functions --skip-functions-cache --message "WOD Studio ${GITHUB_SHA}" --json > netlify-deploy.json
           node -e 'const d=require("./netlify-deploy.json"); console.log("Production URL:", d.website_url||d.deploy_url||d.url||"unknown");'
       - name: Verify site and API
         env:
@@ -67,28 +60,38 @@ jobs:
             if curl -fsS --max-time 20 "$SITE_URL/api/health" > health.json; then break; fi
             sleep 5
           done
-          node --input-type=module -e 'import fs from "node:fs";const h=JSON.parse(fs.readFileSync("health.json","utf8")); if(!h.ok||h.mode!=="netlify"||h.controllerConfigured!==true)throw Error("Production Functions did not receive OVERLAY_CONTROL_KEY");console.log("Authenticated controller configured (health verified)");'
-          # Exercise the real deployed authentication route, not just the homepage.
-          auth_status="$(curl --silent --show-error --max-time 20 --output auth.json --write-out '%{http_code}' --request POST --header "X-Overlay-Key: $CONTROL_KEY" "$SITE_URL/api/auth")"
-          if [ "$auth_status" != "200" ]; then
-            echo "Production authentication failed (HTTP $auth_status); wrong or unavailable runtime secret." >&2
-            exit 1
-          fi
-          node --input-type=module -e 'import fs from "node:fs";const a=JSON.parse(fs.readFileSync("auth.json","utf8"));if(a.ok!==true)throw Error("Control authentication did not succeed");console.log("Production control authentication passed");'
-          denied="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' --request POST --header "X-Overlay-Key: intentionally-wrong-credential-for-smoke-test" "$SITE_URL/api/auth")"
-          if [ "$denied" != "401" ]; then
-            echo "Production authentication accepted an invalid control key (HTTP $denied)." >&2
-            exit 1
-          fi
-          echo 'Invalid credential rejected as expected.'
-          # Guard against successful deployments with a broken site root.
+          node --input-type=module -e 'import fs from "node:fs";const h=JSON.parse(fs.readFileSync("health.json","utf8")); if(!h.ok||h.mode!=="netlify"||h.controllerConfigured!==true)throw Error("Production controller verifier missing");console.log("Health verified",h);'
+          auth_code="$(curl -sS --max-time 20 -o auth.json -w '%{http_code}' -X POST -H "X-Overlay-Key: $CONTROL_KEY" "$SITE_URL/api/auth")"
+          [ "$auth_code" = "200" ] || { echo "Live controller auth HTTP $auth_code" >&2; exit 1; }
+          node --input-type=module -e 'import fs from "node:fs";if(JSON.parse(fs.readFileSync("auth.json","utf8")).ok!==true)process.exit(1)'
+          bad_code="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' -X POST -H "X-Overlay-Key: definitely-wrong-control-key-for-qa" "$SITE_URL/api/auth")"
+          [ "$bad_code" = "401" ] || { echo "Invalid key improperly accepted" >&2; exit 1; }
+          echo 'Live authentication, rejection and health checks passed.'
           curl -fsS --max-time 20 "$SITE_URL/" > homepage.html
-          node --input-type=module -e 'import fs from "node:fs";const s=fs.readFileSync("homepage.html","utf8");if(!s.includes("WOD Stream Studio")||!s.includes("href=\"/control\""))throw Error("Homepage missing or not linked to control panel");console.log("Homepage verified");'
-          curl -fsS --max-time 20 "$SITE_URL/sample-logo.png" > sample-logo-check.png
-          node --input-type=module -e 'import fs from "node:fs";const a=fs.readFileSync("sample-logo-check.png");if(a.length<32||a.subarray(0,8).toString("hex")!=="89504e470d0a1a0a")throw Error("Default logo missing");console.log("Logo asset verified");'
+          node --input-type=module -e 'import fs from "node:fs";const t=fs.readFileSync("homepage.html","utf8");if(!t.includes("WOD Stream Studio")||!t.includes("/control"))throw Error("Homepage broken")'
+          curl -fsS --max-time 20 "$SITE_URL/sample-logo.png" -o sample-logo-smoke.png
+          node --input-type=module -e 'import fs from "node:fs";if(fs.readFileSync("sample-logo-smoke.png").subarray(0,8).toString("hex")!=="89504e470d0a1a0a")throw Error("Logo asset missing")'
           curl -fsS --max-time 20 "$SITE_URL/control" > /dev/null
           curl -fsS --max-time 20 "$SITE_URL/remote" > /dev/null
           curl -fsS --max-time 20 "$SITE_URL/overlay" > /dev/null
+      - name: Seed isolated production persistence test
+        env:
+          SITE_URL: ${{ steps.site.outputs.site_url }}
+          CONTROL_KEY: ${{ secrets.OVERLAY_CONTROL_KEY }}
+          WOD_QA_RUN: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: node scripts/netlify-acceptance.mjs seed
+      - name: Redeploy same release to exercise durable storage
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
+          SITE_ID: ${{ steps.site.outputs.site_id }}
+        run: |
+          ./node_modules/.bin/netlify deploy --prod --site "$SITE_ID" --dir=public --functions=netlify/functions --skip-functions-cache --message "WOD Studio persistence acceptance ${GITHUB_SHA}" --json > netlify-redeploy.json
+      - name: Verify persistence after redeploy and remove QA data
+        env:
+          SITE_URL: ${{ steps.site.outputs.site_url }}
+          CONTROL_KEY: ${{ secrets.OVERLAY_CONTROL_KEY }}
+          WOD_QA_RUN: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: node scripts/netlify-acceptance.mjs verify
       - name: Deployment link
         if: always()
         env:

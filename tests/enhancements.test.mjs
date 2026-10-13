@@ -64,7 +64,7 @@ test('authenticated remote rewind, new assets, saved scenes and persistence',asy
     return {status:r.status,body:await r.json()};
   };
   try{
-    assert.equal((await fetch(base+'/api/health').then(x=>x.json())).version,'1.1.0');
+    assert.equal((await fetch(base+'/api/health').then(x=>x.json())).version,'2.0.0');
     for(const route of ['/remote','/js/remote.js','/css/remote.css','/js/formula-v2.js','/overlay?bg=green','/overlay?bg=black'])assert.equal((await fetch(base+route)).status,200,route);
     assert.equal((await req('/api/timer',{action:'previous'},false)).status,401);
     const patch={timerSettings:{mode:'emom',emomSec:2,emomRounds:4,leadSec:0,timeCapSec:0},left:{athlete:'HEAT 2'},right:{tickerText:'HEAT 2 UP NEXT',showTicker:true}};

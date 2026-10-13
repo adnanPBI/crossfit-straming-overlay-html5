@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import {DEFAULT_SETTINGS,BUILTIN_SCENES,createInitialData,mergeKnown,normalizeSettings} from './public/js/defaults.js';
 import {buildTimeline,describeTimer,effectiveElapsed} from './public/js/timer-engine.js';
+import {createPortableBackup,expandPortableBackup} from './public/js/backup.js';
 
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC=path.join(ROOT,'public');
@@ -108,7 +109,7 @@ export async function createAppServer(options={}) {
       const pathname=url.pathname;
       if(pathname.startsWith('/api/')){
         if(req.method==='GET' && pathname==='/api/state') return send(res,200,snapshot());
-        if(req.method==='GET' && pathname==='/api/health')return send(res,200,{ok:true,version:'1.1.0',uptimeSeconds:Math.round(process.uptime())});
+        if(req.method==='GET' && pathname==='/api/health')return send(res,200,{ok:true,version:'2.0.0',uptimeSeconds:Math.round(process.uptime())});
         if(req.method==='GET' && pathname==='/api/events'){
           if(clients.size>=32)return err(res,503,'Too many overlay subscribers');
           res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform',Connection:'keep-alive','X-Accel-Buffering':'no'});
@@ -118,7 +119,7 @@ export async function createAppServer(options={}) {
         if(!hasCorrectKey(req,key))return err(res,401,'Control key required or incorrect');
         if(req.method==='POST' && pathname==='/api/auth')return send(res,200,{ok:true});
         if(req.method==='GET' && pathname==='/api/scenes')return send(res,200,{scenes:data.scenes.map(s=>({id:s.id,name:s.name,createdAt:s.createdAt}))});
-        if(req.method==='GET' && pathname==='/api/export')return send(res,200,{format:'crossfit-overlay-v1',settings:data.settings,scenes:data.scenes,activeSceneId:data.activeSceneId});
+        if(req.method==='GET' && pathname==='/api/export')return send(res,200,createPortableBackup(data));
         if(req.method==='PATCH' && pathname==='/api/settings'){
           const body=await jsonBody(req);
           if(!body || !body.patch || typeof body.patch!=='object' || Array.isArray(body.patch))return err(res,400,'Expected patch object');
@@ -181,7 +182,7 @@ export async function createAppServer(options={}) {
           await commit();return send(res,200,snapshot());
         }
         if(req.method==='POST' && pathname==='/api/import'){
-          const body=await jsonBody(req,MAX_BACKUP_BODY);
+          const body=expandPortableBackup(await jsonBody(req,MAX_BACKUP_BODY));
           if(body?.format!=='crossfit-overlay-v1')return err(res,400,'Unsupported import format');
           const nextSettings=normalizeSettings(body.settings);
           if(!Array.isArray(body.scenes))return err(res,400,'Missing scenes');

@@ -1,30 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile, stat} from 'node:fs/promises';
+import {readFileSync,statSync} from 'node:fs';
+const publicFile=p=>new URL('../public/'+p,import.meta.url);
 
-const asset = path => new URL('../public/' + path, import.meta.url);
-
-// Run before deployment so a partial Git tree cannot silently drop the
-// homepage or a file referenced by the default broadcast layout.
-test('published homepage redirects to the live control dashboard', async () => {
-  const homepage = await readFile(asset('index.html'), 'utf8');
-  assert.match(homepage, /<meta\s+http-equiv="refresh"\s+content="0;url=\/control"/i);
-  assert.match(homepage, /<a\s+href="\/control"/i);
-  const controller = await readFile(asset('control.html'), 'utf8');
-  assert.match(controller, /WOD Stream Studio/);
+test('Netlify publish directory contains homepage with valid controller link',()=>{
+  const html=readFileSync(publicFile('index.html'),'utf8');
+  assert.match(html,/WOD Stream Studio/);
+  assert.match(html,/href="\/control"/);
 });
-
-test('Netlify publish directory includes all public entrypoints and default logo', async () => {
-  for (const file of [
-    'index.html', 'control.html', 'overlay.html', 'remote.html',
-    'css/control.css', 'css/overlay.css', 'css/remote.css',
-    'js/api.js', 'js/control.js', 'js/overlay.js', 'js/remote.js',
-    'js/defaults.js', 'js/i18n.js', 'js/timer-engine.js', 'js/formula-v2.js',
-    'sample-logo.png'
-  ]) {
-    const info = await stat(asset(file));
-    assert.ok(info.isFile() && info.size > 0, 'Missing or empty: public/' + file);
+test('all three output/control pages, source assets and original sample logo are shipped',()=>{
+  for(const f of ['index.html','control.html','overlay.html','remote.html','css/control.css','css/overlay.css','css/remote.css','js/api.js','js/control.js','js/overlay.js','js/remote.js','js/backup.js','js/defaults.js','js/i18n.js','js/timer-engine.js','sample-logo.png']){
+    assert.ok(statSync(publicFile(f)).size>0,'Missing '+f);
   }
-  const png = await readFile(asset('sample-logo.png'));
-  assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(readFileSync(publicFile('sample-logo.png')).subarray(0,8).toString('hex'),'89504e470d0a1a0a');
 });

@@ -10,7 +10,7 @@
 
 | Nr. | Funktion | Umfang für 200 € | Hinweis / konkrete Grenze |
 |---:|---|---|---|
-| 01 | Drei Zonen links / Mitte / rechts | **enthalten** | Drei sichtbare HTML-Zonen |
+| 01 | Drei Zonen links / Mitte / rechts | **enthalten** | Drei sichtbare HTML-Zonen; Arena, Glas und Minimal |
 | 02 | Getrennte Bedienoberfläche und Overlay-Seite | **enthalten** | `/control`, `/overlay` |
 | 03 | Transparenter Overlay-Hintergrund | **enthalten** | Transparentes `body` für OBS-Browserquelle |
 | 04 | Full HD 1920×1080 | **enthalten** | Standardausgabe 1920×1080; OBS-Quelle entsprechend einstellen |
@@ -35,7 +35,7 @@
 | 23 | Wiederholte Zeitfolgen / Klammern | **enthalten** | z. B. `4*(1m+30)`; max. 240 Abschnitte / 24 Std. |
 | 24 | Timergröße und Timerfarben | **enthalten** | Konfigurierbare Farben und Textgröße |
 | 25 | Grün–Gelb–Rot-Farbwechsel | **enthalten** | Per optionalem Ampelmodus; Restphase cyan |
-| 26 | Signaltöne | **eingeschränkt enthalten** | JavaScript-Ton im Overlay; Autoplay, OBS-Mixer und Zoom-Audio müssen vor Ort geprüft werden |
+| 26 | Signaltöne | **eingeschränkt enthalten** | WebAudio im Overlay; OBS-Audio und Zoom-Tonleitung nur nach Gerätetest |
 | 27 | Tastaturkürzel | **enthalten** | Leertaste Start/Pause, R Reset, N nächster Abschnitt |
 | 28 | WOD / Workout-Infos rechts | **enthalten** | Mehrzeiliger Freitext und Titel |
 | 29 | Trainername / Hinweise rechts | **enthalten** | Direkt live bearbeitbar |
@@ -46,15 +46,15 @@
 | 34 | Zonenbreite anpassen | **enthalten** | Linke/rechte Breite per Regler; Mitte automatisch; Mindestbreite |
 | 35 | Hintergrund-Deckkraft / vollständig transparente Panels | **enthalten** | Separate Transparenzoption für Zonenflächen |
 | 36 | Ein-/Ausblendanimationen | **enthalten** | CSS-Fade-/Reveal; global abschaltbar |
-| 37 | Smartphone-/Tablet-Fernsteuerung | **eingeschränkt enthalten** | Echtzeitsteuerung im selben privaten LAN; Cloud-Fernsteuerung nicht enthalten |
+| 37 | Smartphone-/Tablet-Fernsteuerung | **enthalten** | LAN mit SSE oder Netlify per HTTPS/Polling (~2,4 s), Steuerschlüssel notwendig |
 | 38 | Layouts/Szenen speichern, laden, löschen | **enthalten** | Eingebaute Vorlagen + max. 20 Szenen, dauerhaft auf dem Server |
-| 39 | Szenen-Backup exportieren/importieren | **eingeschränkt enthalten** | JSON; Backups bis etwa 58 MB über GUI importierbar; darüber Datenordner separat kopieren; Datenordner kann zusätzlich kopiert werden |
+| 39 | Szenen-Backup exportieren/importieren | **eingeschränkt enthalten** | JSON v2 mit Logo-Deduplizierung; lokal 60 MB, Netlify max. 5,4 MB (zusätzlich Provider-6-MB-Limit) |
 | 40 | Standardlayout wiederherstellen | **enthalten** | Erhält selbst gespeicherte Szenen |
 | 41 | Oberfläche Deutsch/Englisch/Französisch | **enthalten** | UI und Timerphasen übersetzt |
 | 42 | Oberfläche Spanisch/Italienisch/Portugiesisch | **enthalten** | Zusätzliche auswählbare Sprachpakete; Eigennamen/WOD werden nicht maschinell übersetzt |
-| 43 | Lokal installieren / auf eigenem Server betreiben | **enthalten** | Node.js 20+, ohne Bindung an Entwicklerkonto |
+| 43 | Lokal installieren / auf eigenem Server betreiben | **enthalten** | Lokal Node.js 20+ ohne Entwicklerkonto; Hosting auf kundeneigener Netlify-Instanz möglich, Nutzungskosten separat |
 | 44 | Vollständiger editierbarer Quellcode / Assets | **enthalten** | Ohne Minifizierung oder Codeverschleierung |
-| 45 | Automatisierte Tests | **enthalten** | Timerparser, API, Auth, SSE, Speicherpersistenz, UI-Smoketests |
+| 45 | Automatisierte Tests | **enthalten** | Unit-/API-/Auth-/Backup-/UI-Tests plus isolierte Netlify-Blobs-Persistenz bei erfolgreichem CI-Run |
 | 46 | Testbarer Prototyp | **enthalten** | Start per `npm start`, nicht von fremdem Hosting abhängig |
 | 47 | OBS Browser Source | **eingeschränkt enthalten** | URL-/Auflösungs-/Alpha-Konfiguration dokumentiert; echter Kundengerätetest ist Teil der Abnahme |
 | 48 | Streamlabs Browser Source | **eingeschränkt enthalten** | Standardbrowserquelle voraussichtlich kompatibel; versionsabhängiger Test beim Kunden |
@@ -63,7 +63,7 @@
 | 51 | Teilnehmernamen / Rangliste | **spätere Erweiterung** | Architektur lässt neue Datenfelder zu |
 | 52 | Sponsor-Karussell / mehrere Sponsorlogos | **spätere Erweiterung** | Separate Daten-/Animationskomponente |
 | 53 | Live-Chat / externe Datenfeeds | **spätere Erweiterung** | Zusätzliche API-/Providerintegration erforderlich |
-| 54 | Internetbasierte Fernsteuerung / Cloud-Sync | **spätere Erweiterung** | HTTPS, Nutzerverwaltung, Firewall-/Hostingsicherheit nötig |
+| 54 | Internetbasierte Fernsteuerung / Cloud-Sync | **eingeschränkt enthalten** | Netlify über HTTPS und gemeinsamen Steuerschlüssel; komplexe Benutzerrollen sind spätere Erweiterung |
 | 55 | Eigene Drag-and-Drop-Freiform-Positionierung | **spätere Erweiterung** | Zonenregler sind enthalten; freies Pixel-Dragging nicht |
 | 56 | Marken-/Lizenz-/Rechteübergabe | **enthalten** | Verfahrensbeschreibung und Vertragsvorlage; tatsächliche Übertragung per schriftlicher Zahlungs-/Rechtevereinbarung |
 
@@ -103,3 +103,14 @@
 Diese im Code bereits implementierten Zusatzfunktionen werden ohne neue Drittanbieter-Lizenzen bereitgestellt: AMRAP, EMOM, Tabata, For Time, Zeitformeln mit Work/Rest-Paaren und Wiederholungen, Intervall-zurück, Heat-/Teilnehmerlabel, ein Sponsorenlogo, Lauftext, Hintergrund-Verläufe und Textschatten, 12-/24-Stunden-Uhr, Schwarz-/Greenscreen-Overlay, Warnschwellen und Tonlautstärke, Quick-Mode-Schaltflächen, Timer-only-Szene sowie separate Smartphone-Fernbedienung. In der ursprünglichen Kalkulation gelten sie als **kostenneutral zusätzlich im Quellcode enthalten**. Der vereinbarte Festpreis von 200 € erhöht sich nicht.
 
 **Nicht enthalten / spätere Erweiterung:** WebRTC mit Kamera/Mikrofon, öffentliche Cloud-Räume, Datenbank-/Login-Infrastruktur, Zuschauer-Live-Video, Sponsorenkarussell, komplette Teilnehmerliste und Drittanbieter-Chat. Die tatsächliche Zoom-Übertragung auf Kundenhardware bleibt Abnahmevoraussetzung.
+
+
+## Release 2.0 — nachgetragene Leistungsabgrenzung
+
+- **Enthalten:** Drei visuelle Stile (Arena/Wettkampf, Glas/Studio, Minimal), Kreis-Timer mit nächster Phase, sechs Sprachen, Netlify-Fernsteuerung per HTTPS und Schutzschlüssel, Backup v2 mit Logo-Deduplizierung, automatisierte isolierte QA-Persistenzprüfungen und lesbarer Quellcode.
+- **Eingeschränkt enthalten:** Netlify-Backupimport als JSON mit **5,4 MB HTTP-Limit** und zusätzlichem Netlify-6-MB-Payload-Limit; Einrichten von Audio in OBS nur dokumentiert; Internet-Fernsteuerung aktualisiert ca. alle 2,4 Sekunden, gespeicherte Änderungen letzter-Schreibvorgang-gewinnt.
+- **Spätere Erweiterung:** Mehrere gleichzeitige redaktionelle Benutzer mit Konfliktsperren, ausfallsicherer Multi-Operator-Workflow, umfangreiche dynamische Sponsorverwaltung oder externer Chat, direkte Zoom-Audio-Mischung.
+- **Vor Abnahme zwingend:** Reale OBS-Aufnahme, Zoom-Anruf mit zweitem Prüfer, Audio-/Mobilgerätetest, Rechtsprüfung und beidseitige Unterschriften. Quellcode kann keine tatsächliche Kamera-/Zoomprüfung oder rechtsgültige Unterzeichnung vortäuschen.
+- **Hostingkosten:** Lokal ohne Pflichtabonnement; Netlify ist optional und unterliegt Paket-/Nutzungslimits (Funktionen, Blob-Speicher, Übertragung). Die Anwendung verlangt keine zusätzlichen bezahlten Bibliotheken; externer Dienstbetrieb kann Kosten verursachen.
+- **Rechte:** vorhandene GNU-GPLv3-Lizenz und historische Nutzungsrechte müssen vor exklusiver Abtretung geklärt werden. Separate Dokumentation `LICENSE-RECONCILIATION.md`, `RIGHTS-HANDOVER-TEMPLATE-DE-EN.md`.
+- **Budget/Milestones unverändert:** 20 € / 70 € / 70 € / 40 € = 200 €; Freigabe nur nach jeweiliger Prüfung und dokumentierter Vereinbarung.

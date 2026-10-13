@@ -39,3 +39,8 @@
 - Actual streaming/audio/device testing cannot be certified from unit/API tests or screenshot previews alone.
 - Streamlabs browser source compatibility depends on its installed version; no proprietary Streamlabs API integration is required.
 - The fixed €200 software budget excludes hardware, paid streaming subscriptions, domain and externally managed hosting.
+
+
+## Release 2.0 acceptance addendum
+
+The final commissioning ledger is `docs/RELEASE-ACCEPTANCE-V2.md`, with German device test instructions `docs/STREAMING-ACCEPTANCE-DE.md`. GitHub Actions now has an isolated QA namespace to verify hosted backup, scene and cross-redeploy persistence **without changing any customer show state**. The actual outcome depends on the latest workflow run. Physical OBS recording, Zoom with a second participant, real smartphone, audio routing and legally signed rights must still be documented separately. No automated build silently changes their checkbox state to PASS.

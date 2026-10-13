@@ -2,8 +2,10 @@
 import { createHash, timingSafeEqual, randomUUID, scryptSync } from 'node:crypto';
 import {DEFAULT_SETTINGS,createInitialData,mergeKnown,normalizeSettings} from '../public/js/defaults.js';
 import {describeTimer} from '../public/js/timer-engine.js';
+import {createPortableBackup,expandPortableBackup} from '../public/js/backup.js';
 
-const MAX_BODY=4_000_000;
+// Keep below Netlify's request payload limit; v2 backups deduplicate repeated logos.
+const MAX_BODY=5_400_000;
 const MAX_SCENES=20;
 const safeName=name=>String(name??'').trim().slice(0,64);
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}});
@@ -13,12 +15,9 @@ const equalKey=(supplied,secret)=>{
   const a=createHash('sha256').update(supplied).digest(), b=createHash('sha256').update(secret).digest();
   return timingSafeEqual(a,b);
 };
-// Netlify's runtime environment variable propagation differs across accounts.
- // A salted, server-bundled scrypt verifier permits secure login even when the
- // runtime lacks OVERLAY_CONTROL_KEY. Its plaintext value is never bundled.
 const decodeVerifier=value=>{
   if(!value||typeof value.salt!=='string'||typeof value.hash!=='string')return null;
-  const salt=Buffer.from(value.salt,'base64'), digest=Buffer.from(value.hash,'base64');
+  const salt=Buffer.from(value.salt,'base64'),digest=Buffer.from(value.hash,'base64');
   if(salt.length!==16||digest.length!==32)return null;
   return {salt,digest};
 };
@@ -50,8 +49,10 @@ const validData=loaded=>{
 };
 const snapshot=(data,now)=>({settings:data.settings,timer:data.timer,scenes:data.scenes.map(({id,name,createdAt})=>({id,name,createdAt})),activeSceneId:data.activeSceneId??null,revision:data.revision??0,serverNow:now});
 async function readJson(req){
+  const length=Number(req.headers.get('content-length')||0);
+  if(length>MAX_BODY)throw Object.assign(new Error('Request exceeds 5.4 MB'),{status:413});
   const body=await req.text();
-  if(Buffer.byteLength(body)>MAX_BODY)throw Object.assign(new Error('Request exceeds 4 MB'),{status:413});
+  if(Buffer.byteLength(body)>MAX_BODY)throw Object.assign(new Error('Request exceeds 5.4 MB'),{status:413});
   try{return JSON.parse(body);}catch{throw Object.assign(new Error('Invalid JSON'),{status:400});}
 }
 export function createHandler({getStore,controlKey,controlVerifier}){
@@ -71,17 +72,23 @@ export function createHandler({getStore,controlKey,controlVerifier}){
     const pathname=url.pathname.startsWith('/api/')?url.pathname.slice(5):url.searchParams.get('route')||'';
     const now=Date.now();
     try{
-      if(req.method==='GET'&&pathname==='health')return json({ok:true,version:'1.2.0',mode:'netlify',controllerConfigured:configured});
+      if(req.method==='GET'&&pathname==='health')return json({ok:true,version:'2.0.0',mode:'netlify',controllerConfigured:configured});
       if(req.method==='GET'&&pathname==='events')return error(409,'Serverless deployment uses polling; use /api/state');
+      const qaRun=req.headers.get('x-wod-qa-run');
+      const isQa=typeof qaRun==='string'&&/^ci-[a-z0-9-]{12,40}$/.test(qaRun);
+      if(qaRun&&!isQa)return error(400,'Invalid QA namespace');
+      if(isQa && (!configured||!verifyKey(req.headers.get('x-overlay-key'))))return error(401,'QA access denied');
       const store=getStore();
-      const loaded=await store.get('current',{type:'json',consistency:'strong'});
+      const storageKey=isQa?`qa-${qaRun}`:'current';
+      const loaded=await store.get(storageKey,{type:'json',consistency:'strong'});
       const data=validData(loaded);
       if(req.method==='GET'&&pathname==='state')return json(snapshot(data,now));
       if(!configured)return error(503,'Controller not configured: set OVERLAY_CONTROL_KEY in repository secrets and redeploy');
       if(!verifyKey(req.headers.get('x-overlay-key')))return error(401,'Control key required or incorrect');
       if(req.method==='POST'&&pathname==='auth')return json({ok:true});
+      if(isQa&&req.method==='DELETE'&&pathname==='qa/cleanup'){await store.delete(storageKey);return json({ok:true});}
       if(req.method==='GET'&&pathname==='scenes')return json({scenes:snapshot(data,now).scenes});
-      if(req.method==='GET'&&pathname==='export')return json({format:'crossfit-overlay-v1',settings:data.settings,scenes:data.scenes,activeSceneId:data.activeSceneId});
+      if(req.method==='GET'&&pathname==='export')return json(createPortableBackup(data));
       let result=null,status=200,updated=false;
       if(req.method==='PATCH'&&pathname==='settings'){
         const body=await readJson(req);
@@ -123,7 +130,8 @@ export function createHandler({getStore,controlKey,controlVerifier}){
       }else if(req.method==='POST'&&pathname==='defaults'){
         data.settings=normalizeSettings(DEFAULT_SETTINGS);data.activeSceneId='preset-competition';data.timer={status:'idle',elapsedMs:0,anchorMs:null};updated=true;
       }else if(req.method==='POST'&&pathname==='import'){
-        const body=await readJson(req);
+        let body;
+        try{body=expandPortableBackup(await readJson(req));}catch(e){return error(400,e.message);} 
         if(body?.format!=='crossfit-overlay-v1'||!Array.isArray(body.scenes))return error(400,'Invalid or unsupported import format');
         data.settings=normalizeSettings(body.settings);data.scenes=normalizeScenes(body.scenes);
         data.activeSceneId=typeof body.activeSceneId==='string'&&data.scenes.some(s=>s.id===body.activeSceneId)?body.activeSceneId:null;
@@ -132,7 +140,7 @@ export function createHandler({getStore,controlKey,controlVerifier}){
       if(updated){
         data.revision=(data.revision||0)+1;
         // Blob storage is last-write-wins; one controlling operator is recommended.
-        await store.setJSON('current',data);
+        await store.setJSON(storageKey,data);
       }
       return json(result??snapshot(data,now),status);
     }catch(e){

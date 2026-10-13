@@ -1,33 +1,35 @@
-# Netlify deployment – WOD Stream Studio 1.2
+# Netlify production deployment — WOD Stream Studio 2.0
 
-GitHub Actions deploys this repository to a dedicated site using the `NETLIFY_TOKEN` GitHub repository secret. The workflow creates the site on first run and reuses it for subsequent `main` branch deployments. Its production URL is included in the Actions run summary.
+Production URL: `https://wod-studio-1415661536.netlify.app/`.
 
-## Required secrets
+## GitHub secrets required
 
-1. `NETLIFY_TOKEN` (already supplied by the repository owner): Netlify personal access token, used exclusively in CI and not exposed to the browser.
-2. `OVERLAY_CONTROL_KEY`: **a separate randomly generated password at least 12 characters long**. Add it in GitHub Settings → Secrets and variables → Actions → New repository secret. Example generation: `openssl rand -hex 24`. Never use the Netlify access token for this purpose. The workflow derives a random-salted `scrypt` password verifier from the GitHub Actions secret and bundles **only the verifier** inside the server-side Netlify Function (generated file ignored by Git). The plaintext password is not included in any static HTML/JS or in the Function bundle. This is independent of Netlify runtime environment-variable scope/plan behavior.
+- `NETLIFY_TOKEN`: authorization for GitHub Actions to deploy to a site controlled by the user. Never expose in public URLs or frontend.
+- `OVERLAY_CONTROL_KEY`: a distinct randomly generated password (minimum 12 characters). GitHub Actions generates a random-salted `scrypt` verifier into `netlify/control-verifier.generated.mjs` which is imported by **server-side Functions only**. The source file is gitignored and never contains plaintext. If the key is absent, deployment fails before publishing.
 
-Production deployment fails fast if `OVERLAY_CONTROL_KEY` is absent or fewer than 12 characters. After deployment, GitHub Actions checks that `/api/health` reports `controllerConfigured: true`, authenticates against `/api/auth` using the secret and checks that an incorrect key is rejected. A successful release therefore proves the credential reached the deployed Function. Configure the secret, rerun `Deploy WOD Stream Studio to Netlify` under GitHub Actions, and paste that same secret into `/control` and `/remote`. Do not put the key in a public URL, OBS browser source URL, screenshot or issue.
+The workflow discovers the existing site by its full `wod-studio-1415661536.netlify.app` domain, avoiding duplicate-site API errors. A push to `main` triggers the CI workflow and deploys static files from `public/` and Functions from `netlify/functions/`. `--skip-functions-cache` forces regeneration of the verifier-bundled function.
 
-The verifier is generated per deployment: always redeploy through the GitHub workflow after changing the secret. For local Node hosting, the unchanged local server continues to use its normal control key. A manual Netlify deployment must generate `netlify/control-verifier.generated.mjs` using `CONTROL_KEY` before deploying, and must not commit that file. Build logs contain no plaintext password.
+## Critical deployment tests
 
-## Pages
+1. Run Node tests and syntax checks.
+2. Deploy UI and Functions.
+3. Check health (`controllerConfigured:true`), homepage, logo, dashboard, overlay and remote pages.
+4. Send a real POST `/api/auth` with the secret; ensure an invalid control key is rejected.
+5. Create a separate authenticated `X-Wod-QA-Run` storage namespace (never the customer `current` state). Save a French-language scene and PNG logo, export/import a v2 backup, start/pause/reset the timer.
+6. Redeploy the same release to the existing Netlify site, then verify the isolated saved state and scene persist, load/delete the scene, and remove the isolated QA object. This adds a second Netlify deployment per CI run; check usage limits.
 
-- `/control`: editor, timer transport, layouts and saved scenes; requires control key for mutations.
-- `/overlay`: OBS-compatible transparent broadcast layer (1920x1080 Browser Source).
-- `/remote`: mobile/tablet controller.
-- `/api/health`: public mode and configuration status (never returns secrets).
+Inspect the **actual latest GitHub Actions run**. Do not claim verification if these steps fail; static homepage success alone is insufficient.
 
-## Architecture and trade-offs
+## Data model and limits
 
-Local `npm start` retains the existing Node.js server and streaming SSE. On Netlify, static HTML/CSS/JS is hosted as-is; API calls are routed to a Netlify Function. Netlify Blobs stores site-wide JSON state using strongly consistent reads; timer anchors are server-time-based, so countdowns advance without continuously running a background server. Pages poll state approximately every 2.4s and render timer updates locally at high frame rate.
+Site-wide `@netlify/blobs` is used for storage so scenes persist across deploys. Blob reads are strongly consistent; simultaneous writers to the same key use last-write-wins, not transactions. Use one authoritative show operator. On Netlify, the overlay and remote receive snapshots approximately every 2.4 seconds; local Node SSE is near-live. The timer calculates elapsed time from timestamp anchors between snapshots, so displayed seconds remain fluid.
 
-* Avoid simultaneous edits from multiple controllers: Netlify Blobs uses last-write-wins and is not transactional.
-* Netlify function invocations, Blob storage and bandwidth count against your Netlify subscription limits. Check Netlify billing/usage before prolonged broadcasting. No new paid library is needed for the core application, but hosted usage may incur costs.
-* The live overlay endpoint is intentionally publicly readable (so OBS can access it). Do not put confidential information in broadcast fields.
-* Remote beeps are generated in the viewing browser and do not automatically transmit into Zoom audio.
-* A production OBS→Zoom Virtual Camera acceptance test still requires the streaming PC.
+All saved content on a broadcast is publicly visible through `/api/state`. Do not store private personal details in WOD titles, logos or notes. Control keys must not be placed in URL parameters.
 
-## Re-deploy
+Backups: current export `crossfit-overlay-v2` deduplicates repeated PNG/JPEG/WebP data URLs across scenes; import accepts legacy `crossfit-overlay-v1` too. The hosted import enforces **5.4 MB JSON request**; Netlify buffered Function limit is **6 MB**. Oversized imports should use the local Node server (60 MB limit) or reduce embedded image sizes. Automatic QA uses one small sample logo and is not proof that every maximum-size user upload succeeds.
 
-Push to `main` or choose Actions → Deploy WOD Stream Studio to Netlify → Run workflow. Review its run log and summary for the URL. No server credentials or Netlify account ownership are stored in source control.
+## Costs and self-hosting
+
+Local `npm start`: no mandatory paid cloud service. Netlify Functions, Blobs, bandwidth and deployments follow the account's pricing and free-tier limits; no fixed zero-cost guarantee for hosting. Direct npm dependencies are `@netlify/blobs@11.1.4` (MIT runtime in Netlify) and `netlify-cli@27.12.0` (MIT deployment tool).
+
+Physical OBS → Zoom and microphone/beep routing remain a separate workstation-based acceptance gate. See `docs/RELEASE-ACCEPTANCE-V2.md`, `docs/STREAMING-ACCEPTANCE-DE.md`.

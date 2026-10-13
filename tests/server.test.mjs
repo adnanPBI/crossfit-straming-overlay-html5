@@ -40,8 +40,8 @@ test('HTTP routes, authentication, realtime state, scenes and persistence',async
     const loaded=await request(base,'/api/scenes/load',{id:saved.data.scene.id});
     assert.equal(loaded.data.settings.left.title,'Nouveau WOD');
     const exportData=await fetch(`${base}/api/export`,{headers:{'X-Overlay-Key':key}}).then(r=>r.json());
-    assert.equal(exportData.format,'crossfit-overlay-v1');
-    assert.equal(exportData.scenes.length,publicState.scenes.length+1);
+    assert.equal(exportData.format,'crossfit-overlay-v2');
+    assert.equal(exportData.scenes.length,4);
     const malicious=await request(base,'/api/settings',{patch:{'__proto__':null,left:{logoDataUrl:'javascript:alert(1)'}}},key,'PATCH');
     assert.equal(malicious.status,400);
     const badFormula=await request(base,'/api/settings',{patch:{timerSettings:{mode:'sequence',formula:'4*(abc)'}}},key,'PATCH');
@@ -50,13 +50,13 @@ test('HTTP routes, authentication, realtime state, scenes and persistence',async
     assert.equal((await request(base,'/api/import',exportData)).status,200);
     assert.equal((await request(base,`/api/scenes/${saved.data.scene.id}`,null,key,'DELETE')).status,200);
     const persisted=JSON.parse(await readFile(path.join(dataDir,'state.json'),'utf8'));
-    assert.equal(persisted.scenes.length,publicState.scenes.length);
+    assert.equal(persisted.scenes.length,3);
     await app.close();app=null;
     app=await createAppServer({host:'127.0.0.1',port:0,dataDir,key});
     base=`http://127.0.0.1:${app.port}`;
     const after=await (await fetch(`${base}/api/state`)).json();
     assert.equal(after.settings.language,'fr');
-    assert.equal(after.scenes.length,publicState.scenes.length);
+    assert.equal(after.scenes.length,3);
     assert.equal((await fetch(`${base}/api/health`)).status,200);
   }finally{if(app)await app.close();await rm(dataDir,{recursive:true,force:true});}
 });

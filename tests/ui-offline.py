@@ -38,6 +38,7 @@ window.fetch=async(url,options={})=>{
   const method=options.method||'GET';const endpoint=String(url);
   const response=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
   const auth=options.headers?.['X-Overlay-Key'];
+  if(endpoint==='/api/health')return response({ok:true,mode:'local'});
   if(endpoint==='/api/state')return response({...clone(window.__remote.db),serverNow:Date.now()});
   if(auth!==window.__remote.key)return response({error:'Bad key'},401);
   if(endpoint==='/api/auth')return response({ok:true});
@@ -70,7 +71,7 @@ async def run():
         await desktop.set_content(stripped_html('control.html'))
         await desktop.add_style_tag(content=(ROOT/'public/css/control.css').read_text())
         await desktop.add_script_tag(content=MOCK.replace('__STATE__',json.dumps(state)))
-        await desktop.add_script_tag(content=combine('timer-engine.js','i18n.js','api.js','control.js'))
+        await desktop.add_script_tag(content=combine('formula-v2.js','timer-engine.js','i18n.js','api.js','control.js'))
         await desktop.wait_for_timeout(150)
         assert await desktop.locator('#loginOverlay').is_visible(),'Key dialog missing'
         await desktop.locator('#keyInput').fill('offline-test-key-abcdef')
@@ -78,6 +79,13 @@ async def run():
         await desktop.locator('#loginOverlay').wait_for(state='hidden',timeout=3000)
         assert await desktop.locator('[data-path="left.title"]').input_value()=='THE DAILY GRIND'
         assert await desktop.locator('[data-path="timerSettings.mode"]').input_value()=='intervals'
+        assert await desktop.locator('#modeChips button').count()==8
+        await desktop.locator('#modeChips button[data-mode="emom"]').click()
+        await desktop.wait_for_timeout(400)
+        assert await desktop.locator('[data-path="timerSettings.mode"]').input_value()=='emom'
+        assert await desktop.locator('#modeChips button[data-mode="emom"]').get_attribute('aria-pressed')=='true'
+        await desktop.locator('#modeChips button[data-mode="intervals"]').click()
+        await desktop.wait_for_timeout(400)
         assert await desktop.locator('[data-path="timerSettings.primaryColor"]').input_value()=='#7cfaab'
         await desktop.locator('#previewFrame').evaluate('(e) => {e.src="about:blank"; e.style.display="none";}')
         await desktop.screenshot(path=str(OUT/'control-live-desktop.png'),full_page=True)
@@ -88,6 +96,9 @@ async def run():
         await desktop.locator('[data-path="right.coach"]').fill('ENTRAÎNEUR LUCIE')
         await desktop.wait_for_timeout(450)
         assert (await desktop.evaluate('window.__remote.db.settings.right.coach'))=='ENTRAÎNEUR LUCIE'
+        await desktop.locator('[data-path="right.tickerText"]').fill('NEXT CLASS 17:00')
+        await desktop.wait_for_timeout(450)
+        assert await desktop.evaluate('window.__remote.db.settings.right.tickerText')=='NEXT CLASS 17:00'
         await desktop.locator('[data-tab="timer"]').click()
         await desktop.locator('#startPauseBtn').click()
         await desktop.wait_for_timeout(200)
@@ -112,7 +123,7 @@ async def run():
         await mobile.set_content(stripped_html('control.html'))
         await mobile.add_style_tag(content=(ROOT/'public/css/control.css').read_text())
         await mobile.add_script_tag(content=MOCK.replace('__STATE__',json.dumps(state)))
-        await mobile.add_script_tag(content=combine('timer-engine.js','i18n.js','api.js','control.js'))
+        await mobile.add_script_tag(content=combine('formula-v2.js','timer-engine.js','i18n.js','api.js','control.js'))
         await mobile.wait_for_timeout(110)
         await mobile.locator('#keyInput').fill('offline-test-key-abcdef')
         await mobile.locator('#loginForm button[type=submit]').click()

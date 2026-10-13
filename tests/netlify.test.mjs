@@ -11,13 +11,14 @@ function req(path,method='GET',body=null,key='1234567890abcdef'){
 }
 test('Netlify health and public display work without control key; writes are protected',async()=>{
   const store=fakeStorage();const handler=createHandler({...store,controlKey:undefined});
-  assert.equal((await (await handler(req('health'))).json()).mode,'netlify');
+  const health=await (await handler(req('health'))).json();assert.equal(health.mode,'netlify');assert.equal(health.controllerConfigured,false);
   assert.equal((await (await handler(req('state'))).json()).timer.status,'idle');
   const denied=await handler(req('timer','POST',{action:'start'}));assert.equal(denied.status,503);
 });
 test('serverless backend synchronizes timer, settings and scene persistence',async()=>{
   const store=fakeStorage(); const handle=createHandler({...store,controlKey:'1234567890abcdef'});
   const send=(path,method='GET',body)=>handle(req(path,method,body));
+  assert.equal((await (await send('health')).json()).controllerConfigured,true);
   assert.equal((await send('auth','POST')).status,200);
   assert.equal((await handle(req('auth','POST',null,'wrong'))).status,401);
   const patch=await send('settings','PATCH',{patch:{left:{title:'LIVE ONLINE'},timerSettings:{mode:'countdown',durationSec:75}}});

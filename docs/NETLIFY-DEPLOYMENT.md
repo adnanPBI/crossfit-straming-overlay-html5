@@ -5,9 +5,11 @@ GitHub Actions deploys this repository to a dedicated site using the `NETLIFY_TO
 ## Required secrets
 
 1. `NETLIFY_TOKEN` (already supplied by the repository owner): Netlify personal access token, used exclusively in CI and not exposed to the browser.
-2. `OVERLAY_CONTROL_KEY`: **a separate randomly generated password at least 12 characters long**. Add it in GitHub Settings → Secrets and variables → Actions → New repository secret. Example generation: `openssl rand -hex 24`. Never use the Netlify access token for this purpose. The workflow securely sets this as a Netlify **production Functions secret** during deployment.
+2. `OVERLAY_CONTROL_KEY`: **a separate randomly generated password at least 12 characters long**. Add it in GitHub Settings → Secrets and variables → Actions → New repository secret. Example generation: `openssl rand -hex 24`. Never use the Netlify access token for this purpose. The workflow passes this directly to the deployed Netlify Functions through the Netlify CLI `deploy --secret-env` option; it is masked in Netlify deployment records and never embedded in public HTML, JS or configuration files.
 
-If `OVERLAY_CONTROL_KEY` is absent, the public display and preview work but modifications, timers and remote controls are intentionally disabled (503); no insecure default password is created. Configure the key, rerun `Deploy WOD Stream Studio to Netlify` under GitHub Actions, and paste the key into the login box at `/control` and `/remote`. Do not put the key in a public URL or OBS browser source URL.
+Production deployment fails fast if `OVERLAY_CONTROL_KEY` is absent or fewer than 12 characters. After deployment, GitHub Actions checks that `/api/health` reports `controllerConfigured: true`, authenticates against `/api/auth` using the secret and checks that an incorrect key is rejected. A successful release therefore proves the credential reached the deployed Function. Configure the secret, rerun `Deploy WOD Stream Studio to Netlify` under GitHub Actions, and paste that same secret into `/control` and `/remote`. Do not put the key in a public URL, OBS browser source URL, screenshot or issue.
+
+The key is provided per deployment: always redeploy through the GitHub workflow when changing the secret. A manual deploy that does not include the `--secret-env` option may not receive the key.
 
 ## Pages
 

@@ -29,38 +29,56 @@ jobs:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
           NETLIFY_SITE_NAME: wod-studio-1415661536
         run: node scripts/netlify-site.mjs
-      - name: Configure private control key, if supplied
+      - name: Validate controller secret for production
         env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
-          SITE_ID: ${{ steps.site.outputs.site_id }}
           CONTROL_KEY: ${{ secrets.OVERLAY_CONTROL_KEY }}
         run: |
-          if [ -n "$CONTROL_KEY" ]; then
-            if [ "${#CONTROL_KEY}" -lt 12 ]; then echo 'OVERLAY_CONTROL_KEY must be at least 12 characters' >&2; exit 1; fi
-            echo '::add-mask::'$CONTROL_KEY
-            ./node_modules/.bin/netlify env:set OVERLAY_CONTROL_KEY "$CONTROL_KEY" --context production --scope functions --secret --site "$SITE_ID" --auth "$NETLIFY_AUTH_TOKEN" --force
-            echo 'Remote control authentication configured.'
-          else
-            echo 'OVERLAY_CONTROL_KEY secret not found: publishing read-only overlay until it is configured.'
+          set -euo pipefail
+          if [ -z "$CONTROL_KEY" ]; then
+            echo 'OVERLAY_CONTROL_KEY is required for authenticated production control.' >&2
+            exit 1
           fi
+          if [ "${#CONTROL_KEY}" -lt 12 ]; then
+            echo 'OVERLAY_CONTROL_KEY must be at least 12 characters.' >&2
+            exit 1
+          fi
+          echo "::add-mask::$CONTROL_KEY"
+          echo 'Controller credential received from GitHub Actions secrets.'
       - name: Deploy static UI and serverless functions
         id: publish
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
           SITE_ID: ${{ steps.site.outputs.site_id }}
+          CONTROL_KEY: ${{ secrets.OVERLAY_CONTROL_KEY }}
         run: |
-          ./node_modules/.bin/netlify deploy --prod --site "$SITE_ID" --dir=public --functions=netlify/functions --message "WOD Studio ${GITHUB_SHA}" --json > netlify-deploy.json
+          # Secret deploy variables are injected into deployed Functions, without a
+          # dependency on account-tier-specific site-variable scopes.
+          ./node_modules/.bin/netlify deploy --prod --context production --site "$SITE_ID" --dir=public --functions=netlify/functions --secret-env "OVERLAY_CONTROL_KEY=$CONTROL_KEY" --message "WOD Studio ${GITHUB_SHA}" --json > netlify-deploy.json
           node -e 'const d=require("./netlify-deploy.json"); console.log("Production URL:", d.website_url||d.deploy_url||d.url||"unknown");'
       - name: Verify site and API
         env:
           SITE_URL: ${{ steps.site.outputs.site_url }}
+          CONTROL_KEY: ${{ secrets.OVERLAY_CONTROL_KEY }}
         run: |
-          set -e
+          set -euo pipefail
           for attempt in 1 2 3 4 5 6; do
             if curl -fsS --max-time 20 "$SITE_URL/api/health" > health.json; then break; fi
             sleep 5
           done
-          node --input-type=module -e 'import fs from "node:fs";const h=JSON.parse(fs.readFileSync("health.json","utf8")); if(!h.ok||h.mode!=="netlify")process.exit(1);console.log("Health verified",h);'
+          node --input-type=module -e 'import fs from "node:fs";const h=JSON.parse(fs.readFileSync("health.json","utf8")); if(!h.ok||h.mode!=="netlify"||h.controllerConfigured!==true)throw Error("Production Functions did not receive OVERLAY_CONTROL_KEY");console.log("Authenticated controller configured (health verified)");'
+          # Exercise the real deployed authentication route, not just the homepage.
+          auth_status="$(curl --silent --show-error --max-time 20 --output auth.json --write-out '%{http_code}' --request POST --header "X-Overlay-Key: $CONTROL_KEY" "$SITE_URL/api/auth")"
+          if [ "$auth_status" != "200" ]; then
+            echo "Production authentication failed (HTTP $auth_status); wrong or unavailable runtime secret." >&2
+            exit 1
+          fi
+          node --input-type=module -e 'import fs from "node:fs";const a=JSON.parse(fs.readFileSync("auth.json","utf8"));if(a.ok!==true)throw Error("Control authentication did not succeed");console.log("Production control authentication passed");'
+          denied="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' --request POST --header "X-Overlay-Key: intentionally-wrong-credential-for-smoke-test" "$SITE_URL/api/auth")"
+          if [ "$denied" != "401" ]; then
+            echo "Production authentication accepted an invalid control key (HTTP $denied)." >&2
+            exit 1
+          fi
+          echo 'Invalid credential rejected as expected.'
           # Guard against successful deployments with a broken site root.
           curl -fsS --max-time 20 "$SITE_URL/" > homepage.html
           node --input-type=module -e 'import fs from "node:fs";const s=fs.readFileSync("homepage.html","utf8");if(!s.includes("WOD Stream Studio")||!s.includes("href=\"/control\""))throw Error("Homepage missing or not linked to control panel");console.log("Homepage verified");'

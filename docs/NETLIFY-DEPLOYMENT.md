@@ -5,11 +5,11 @@ GitHub Actions deploys this repository to a dedicated site using the `NETLIFY_TO
 ## Required secrets
 
 1. `NETLIFY_TOKEN` (already supplied by the repository owner): Netlify personal access token, used exclusively in CI and not exposed to the browser.
-2. `OVERLAY_CONTROL_KEY`: **a separate randomly generated password at least 12 characters long**. Add it in GitHub Settings → Secrets and variables → Actions → New repository secret. Example generation: `openssl rand -hex 24`. Never use the Netlify access token for this purpose. The workflow passes this directly to the deployed Netlify Functions through the Netlify CLI `deploy --secret-env` option; it is masked in Netlify deployment records and never embedded in public HTML, JS or configuration files.
+2. `OVERLAY_CONTROL_KEY`: **a separate randomly generated password at least 12 characters long**. Add it in GitHub Settings → Secrets and variables → Actions → New repository secret. Example generation: `openssl rand -hex 24`. Never use the Netlify access token for this purpose. The workflow derives a random-salted `scrypt` password verifier from the GitHub Actions secret and bundles **only the verifier** inside the server-side Netlify Function (generated file ignored by Git). The plaintext password is not included in any static HTML/JS or in the Function bundle. This is independent of Netlify runtime environment-variable scope/plan behavior.
 
 Production deployment fails fast if `OVERLAY_CONTROL_KEY` is absent or fewer than 12 characters. After deployment, GitHub Actions checks that `/api/health` reports `controllerConfigured: true`, authenticates against `/api/auth` using the secret and checks that an incorrect key is rejected. A successful release therefore proves the credential reached the deployed Function. Configure the secret, rerun `Deploy WOD Stream Studio to Netlify` under GitHub Actions, and paste that same secret into `/control` and `/remote`. Do not put the key in a public URL, OBS browser source URL, screenshot or issue.
 
-The key is provided per deployment: always redeploy through the GitHub workflow when changing the secret. A manual deploy that does not include the `--secret-env` option may not receive the key.
+The verifier is generated per deployment: always redeploy through the GitHub workflow after changing the secret. For local Node hosting, the unchanged local server continues to use its normal control key. A manual Netlify deployment must generate `netlify/control-verifier.generated.mjs` using `CONTROL_KEY` before deploying, and must not commit that file. Build logs contain no plaintext password.
 
 ## Pages
 

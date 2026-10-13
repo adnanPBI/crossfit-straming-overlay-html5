@@ -44,16 +44,18 @@ jobs:
           fi
           echo "::add-mask::$CONTROL_KEY"
           echo 'Controller credential received from GitHub Actions secrets.'
+      - name: Prepare private control verifier for Netlify Functions
+        env:
+          CONTROL_KEY: ${{ secrets.OVERLAY_CONTROL_KEY }}
+        run: node scripts/generate-control-verifier.mjs
       - name: Deploy static UI and serverless functions
         id: publish
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
           SITE_ID: ${{ steps.site.outputs.site_id }}
-          CONTROL_KEY: ${{ secrets.OVERLAY_CONTROL_KEY }}
         run: |
-          # Secret deploy variables are injected into deployed Functions, without a
-          # dependency on account-tier-specific site-variable scopes.
-          ./node_modules/.bin/netlify deploy --prod --context production --site "$SITE_ID" --dir=public --functions=netlify/functions --secret-env "OVERLAY_CONTROL_KEY=$CONTROL_KEY" --message "WOD Studio ${GITHUB_SHA}" --json > netlify-deploy.json
+          # Function contains a generated salted verifier, not the plaintext key.
+          ./node_modules/.bin/netlify deploy --prod --context production --site "$SITE_ID" --dir=public --functions=netlify/functions --skip-functions-cache --message "WOD Studio ${GITHUB_SHA}" --json > netlify-deploy.json
           node -e 'const d=require("./netlify-deploy.json"); console.log("Production URL:", d.website_url||d.deploy_url||d.url||"unknown");'
       - name: Verify site and API
         env:

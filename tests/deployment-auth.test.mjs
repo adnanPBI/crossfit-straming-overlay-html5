@@ -5,7 +5,8 @@ import {readFileSync} from 'node:fs';
 const workflow=readFileSync(new URL('../.github/workflows/deploy-netlify.yml',import.meta.url),'utf8');
 
 test('Netlify production deployment supplies the control key to functions securely',()=>{
-  assert.match(workflow,/--secret-env "OVERLAY_CONTROL_KEY=\$CONTROL_KEY"/);
+  assert.match(workflow,/node scripts\/generate-control-verifier.mjs/);
+  assert.match(workflow,/--skip-functions-cache/);
   assert.match(workflow,/--prod --context production/);
   assert.doesNotMatch(workflow,/netlify env:set OVERLAY_CONTROL_KEY/);
 });

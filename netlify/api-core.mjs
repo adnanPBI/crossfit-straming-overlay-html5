@@ -1,5 +1,5 @@
 /** Netlify stateless HTTP adapter: same public API as the local Node server. */
-import { createHash, timingSafeEqual, randomUUID } from 'node:crypto';
+import { createHash, timingSafeEqual, randomUUID, scryptSync } from 'node:crypto';
 import {DEFAULT_SETTINGS,createInitialData,mergeKnown,normalizeSettings} from '../public/js/defaults.js';
 import {describeTimer} from '../public/js/timer-engine.js';
 
@@ -12,6 +12,15 @@ const equalKey=(supplied,secret)=>{
   if(typeof supplied!=='string'||!supplied||Buffer.byteLength(supplied)>256||!secret)return false;
   const a=createHash('sha256').update(supplied).digest(), b=createHash('sha256').update(secret).digest();
   return timingSafeEqual(a,b);
+};
+// Netlify's runtime environment variable propagation differs across accounts.
+ // A salted, server-bundled scrypt verifier permits secure login even when the
+ // runtime lacks OVERLAY_CONTROL_KEY. Its plaintext value is never bundled.
+const decodeVerifier=value=>{
+  if(!value||typeof value.salt!=='string'||typeof value.hash!=='string')return null;
+  const salt=Buffer.from(value.salt,'base64'), digest=Buffer.from(value.hash,'base64');
+  if(salt.length!==16||digest.length!==32)return null;
+  return {salt,digest};
 };
 const validTimer=t=>t && ['idle','running','paused','finished'].includes(t.status)
   && Number.isFinite(t.elapsedMs)&&t.elapsedMs>=0&&t.elapsedMs<=10000000000
@@ -45,21 +54,31 @@ async function readJson(req){
   if(Buffer.byteLength(body)>MAX_BODY)throw Object.assign(new Error('Request exceeds 4 MB'),{status:413});
   try{return JSON.parse(body);}catch{throw Object.assign(new Error('Invalid JSON'),{status:400});}
 }
-export function createHandler({getStore,controlKey}){
+export function createHandler({getStore,controlKey,controlVerifier}){
   if(typeof getStore!=='function')throw new TypeError('getStore must be a function');
+  const verifier=decodeVerifier(controlVerifier);
+  const configured=!!verifier||(typeof controlKey==='string'&&controlKey.length>=12);
+  const verifyKey=supplied=>{
+    if(typeof supplied!=='string'||!supplied||Buffer.byteLength(supplied)>256)return false;
+    if(verifier){
+      const actual=scryptSync(supplied,verifier.salt,32);
+      return timingSafeEqual(actual,verifier.digest);
+    }
+    return equalKey(supplied,controlKey);
+  };
   return async function handle(req){
     const url=new URL(req.url);
     const pathname=url.pathname.startsWith('/api/')?url.pathname.slice(5):url.searchParams.get('route')||'';
     const now=Date.now();
     try{
-      if(req.method==='GET'&&pathname==='health')return json({ok:true,version:'1.2.0',mode:'netlify',controllerConfigured:typeof controlKey==='string'&&controlKey.length>=12});
+      if(req.method==='GET'&&pathname==='health')return json({ok:true,version:'1.2.0',mode:'netlify',controllerConfigured:configured});
       if(req.method==='GET'&&pathname==='events')return error(409,'Serverless deployment uses polling; use /api/state');
       const store=getStore();
       const loaded=await store.get('current',{type:'json',consistency:'strong'});
       const data=validData(loaded);
       if(req.method==='GET'&&pathname==='state')return json(snapshot(data,now));
-      if(!controlKey||controlKey.length<12)return error(503,'Controller not configured: set OVERLAY_CONTROL_KEY in repository secrets and redeploy');
-      if(!equalKey(req.headers.get('x-overlay-key'),controlKey))return error(401,'Control key required or incorrect');
+      if(!configured)return error(503,'Controller not configured: set OVERLAY_CONTROL_KEY in repository secrets and redeploy');
+      if(!verifyKey(req.headers.get('x-overlay-key')))return error(401,'Control key required or incorrect');
       if(req.method==='POST'&&pathname==='auth')return json({ok:true});
       if(req.method==='GET'&&pathname==='scenes')return json({scenes:snapshot(data,now).scenes});
       if(req.method==='GET'&&pathname==='export')return json({format:'crossfit-overlay-v1',settings:data.settings,scenes:data.scenes,activeSceneId:data.activeSceneId});

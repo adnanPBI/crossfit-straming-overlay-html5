@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHandler} from '../netlify/api-core.mjs';
+import {scryptSync} from 'node:crypto';
 
 function fakeStorage(){
   let current=null;
@@ -38,4 +39,24 @@ test('Netlify rewrite passes route query and rejects bad payloads and deletion o
   assert.equal((await response.json()).ok,true);
   assert.equal((await handle(req('scenes/preset-minimal','DELETE'))).status,403);
   assert.equal((await handle(req('import','POST',{format:'invalid'}))).status,400);
+});
+
+test('server-only compiled control verifier authenticates without a runtime environment key',async()=>{
+  const key='1234567890abcdef';
+  const salt=Buffer.alloc(16,7);
+  const controlVerifier={salt:salt.toString('base64'),hash:scryptSync(key,salt,32).toString('base64')};
+  const handle=createHandler({...fakeStorage(),controlKey:undefined,controlVerifier});
+  assert.equal((await (await handle(req('health'))).json()).controllerConfigured,true);
+  assert.equal((await handle(req('auth','POST',null,key))).status,200);
+  assert.equal((await handle(req('auth','POST',null,'totally-wrong-key'))).status,401);
+  assert.equal((await handle(req('timer','POST',{action:'start'},key))).status,200);
+});
+
+test('compiled verifier takes precedence over any stale runtime key',async()=>{
+  const salt=Buffer.alloc(16,11);
+  const valid='1234567890abcdef';
+  const verifier={salt:salt.toString('base64'),hash:scryptSync(valid,salt,32).toString('base64')};
+  const handler=createHandler({...fakeStorage(),controlKey:'stale-runtime-key-123',controlVerifier:verifier});
+  assert.equal((await handler(req('auth','POST',null,valid))).status,200);
+  assert.equal((await handler(req('auth','POST',null,'stale-runtime-key-123'))).status,401);
 });

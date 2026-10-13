@@ -5,3 +5,4 @@ data/*
 .DS_Store
 .env
 qa-output/
+netlify/control-verifier.generated.mjs
